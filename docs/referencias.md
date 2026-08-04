@@ -101,4 +101,4 @@ https://rocm.docs.amd.com. Acesso em: 2026.
 **[HEMERLI 2019]** HEMERLI, F. M. S. **Computação de alto desempenho usando Numba para cálculo de
 agregação de matéria**. 2019. Trabalho de Conclusão de Curso (Licenciatura em Física) —
 Centro de Ciências Exatas, Naturais e da Saúde, Universidade Federal do Espírito Santo, Alegre,
-2019. Orientador: Prof. Dr. Roberto Colistete Júnior.
+2019. Orientador: Prof. Dr. Roberto Colistete Júnior. Disponível em: https://fisica.alegre.ufes.br/sites/fisica.alegre.ufes.br/files/field/anexo/numba_agregacao_materia_flavio_m_s_hemerli_tcc_lic_fisica_alegre_20190711.pdf. Acesso em: 3 ago. 2026.

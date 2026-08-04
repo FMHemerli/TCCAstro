@@ -1,8 +1,15 @@
 # TCCAstro
 
+![Python](https://img.shields.io/badge/Python-3776AB?logo=python&logoColor=white)
+![PyTorch](https://img.shields.io/badge/PyTorch-EE4C2C?logo=pytorch&logoColor=white)
+![Triton](https://img.shields.io/badge/Triton-8A2BE2)
+![ROCm](https://img.shields.io/badge/ROCm-ED1C24?logo=amd&logoColor=white)
+![NumPy](https://img.shields.io/badge/NumPy-013243?logo=numpy&logoColor=white)
+[![License: AGPL v3](https://img.shields.io/badge/License-AGPL_v3-blue.svg)](LICENSE)
+
 Simulação de n-corpos gravitacional com comparação de desempenho entre métodos de integração e arquiteturas de hardware. O repositório consolida o trabalho de 2019 (implementação em Numba com GPU NVIDIA) com a modernização de 2026 (PyTorch com Triton, suporte GPU AMD).
 
-O trabalho de 2019 foi desenvolvido como Trabalho de Conclusão de Curso da Licenciatura em Física da Universidade Federal do Espírito Santo, sob orientação do **Prof. Dr. Roberto Colistete Júnior** [HEMERLI 2019].
+O trabalho de 2019 foi desenvolvido como Trabalho de Conclusão de Curso da Licenciatura em Física da Universidade Federal do Espírito Santo, sob orientação do **Prof. Dr. Roberto Colistete Júnior**. A monografia completa está disponível no [site do curso de Física da UFES em Alegre](https://fisica.alegre.ufes.br/sites/fisica.alegre.ufes.br/files/field/anexo/numba_agregacao_materia_flavio_m_s_hemerli_tcc_lic_fisica_alegre_20190711.pdf) [HEMERLI 2019].
 
 ## Enquadramento do problema
 
@@ -335,7 +342,7 @@ Os resultados são gravados em `results/2026/` como CSV estruturado, com metadad
 
 ## Referências
 
-[HEMERLI 2019] HEMERLI, F. M. S. Computação de alto desempenho usando Numba para cálculo de agregação de matéria. 2019. Trabalho de Conclusão de Curso (Licenciatura em Física) — Centro de Ciências Exatas, Naturais e da Saúde, Universidade Federal do Espírito Santo, Alegre, 2019.
+[HEMERLI 2019] HEMERLI, F. M. S. Computação de alto desempenho usando Numba para cálculo de agregação de matéria. 2019. Trabalho de Conclusão de Curso (Licenciatura em Física) — Centro de Ciências Exatas, Naturais e da Saúde, Universidade Federal do Espírito Santo, Alegre, 2019. Disponível em: https://fisica.alegre.ufes.br/sites/fisica.alegre.ufes.br/files/field/anexo/numba_agregacao_materia_flavio_m_s_hemerli_tcc_lic_fisica_alegre_20190711.pdf. Acesso em: 3 ago. 2026.
 
 [LAM 2015] LAM, S. K.; PITROU, A.; SEIBERT, S. Numba: a LLVM-based Python JIT compiler. In: Proceedings of the Second Workshop on the LLVM Compiler Infrastructure in HPC (LLVM-HPC 2015). New York: ACM, 2015.
 
