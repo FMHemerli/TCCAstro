@@ -1,0 +1,19 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.ipynb_checkpoints/
+
+# Virtual environment
+.venv/
+
+# IDE
+.idea/
+
+# Torch Inductor / Triton caches
+.torchinductor_cache/
+.triton/
+
+# figures/ and results/ are committed on purpose: the README and the
+# reproducibility claims depend on them being in the repository.
