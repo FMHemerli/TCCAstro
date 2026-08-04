@@ -20,7 +20,7 @@ Variação lenta e sistemática de uma quantidade conservada (como energia) ao l
 
 **Energia potencial gravitacional**
 
-Energia armazenada na configuração espacial das partículas interagindo pela gravidade, dada por $U = -\sum_{i<j} G m_i m_j / (|r_i - r_j|^2 + \varepsilon^2)^{1/2}$ com amolecimento de Plummer. Em um sistema isolado com partida fria (velocidades nulas) tem-se $K_0 = 0$ e portanto $E_0 = U_0$ **no passo inicial**. Como o sistema amolecido é hamiltoniano, a energia total é conservada no fluxo contínuo, logo $E(t) = U_0$ em todo instante; todo desvio dessa identidade é erro numérico. Note que isso **não** significa $E(t) = U(t)$ para $t > 0$: assim que o colapso começa, $K > 0$ e $U < U_0$.
+Energia armazenada na configuração espacial das partículas interagindo pela gravidade, dada por $U = -\sum_{i \lt j} G m_i m_j / (|r_i - r_j|^2 + \varepsilon^2)^{1/2}$ com amolecimento de Plummer. Em um sistema isolado com partida fria (velocidades nulas) tem-se $K_0 = 0$ e portanto $E_0 = U_0$ **no passo inicial**. Como o sistema amolecido é hamiltoniano, a energia total é conservada no fluxo contínuo, logo $E(t) = U_0$ em todo instante; todo desvio dessa identidade é erro numérico. Note que isso **não** significa $E(t) = U(t)$ para $t > 0$: assim que o colapso começa, $K > 0$ e $U \lt U_0$.
 
 **Euler semi-implícito**
 

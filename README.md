@@ -33,7 +33,7 @@ $$a_i = G \sum_{j \neq i} \frac{m_j (r_j - r_i)}{(|r_j - r_i|^2 + \varepsilon^2)
 
 e a energia potencial gravitacional correspondente é
 
-$$U = -\sum_{i<j} \frac{G m_i m_j}{(|r_i - r_j|^2 + \varepsilon^2)^{1/2}}.$$
+$$U = -\sum_{i \lt j} \frac{G m_i m_j}{(|r_i - r_j|^2 + \varepsilon^2)^{1/2}}.$$
 
 Força e potencial formam um par consistente ($a = -\nabla U / m$). O sistema amolecido é autônomo e hamiltoniano, logo a energia total é exatamente conservada no fluxo contínuo. Com partida fria (velocidades nulas) $K_0 = 0$, portanto $E_0 = U_0$ por definição, e $E(t) = U_0$ é identidade do problema — todo desvio medido é erro do [integrador](docs/glossario.md).
 
