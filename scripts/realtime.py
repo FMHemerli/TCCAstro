@@ -1,12 +1,14 @@
 """
-Real-time interactive visualisation of the cold spherical collapse.
+Real-time interactive visualisation of the spherical collapse.
 
 A visual toy, not an instrument: it runs, shows the collapse happening live, and stops. It does
 not write a report, a CSV, a figure, or any other file.
 
-Physics comes only from the validated core in src/nbody/: initial_conditions.cold_sphere for the
-initial condition and integrators.integrate with integrator="velocity_verlet" for every step. No
-force law or integrator is reimplemented here.
+Physics comes only from the validated core in src/nbody/: initial_conditions.cold_sphere (with
+--cold) or initial_conditions.random_sphere (the default, mass spectrum + virial-ratio velocities)
+for the initial condition, and integrators.integrate with integrator="velocity_verlet" for every
+step. No force law, integrator or sampling distribution is reimplemented here -- --alpha,
+--mass-ratio, --virial-q, --f-cut and --seed are passed straight through to random_sphere.
 
 Coupling between simulation and frames: a fixed simulation timestep dt (a fixed fraction of the
 analytic free-fall time t_ff), a fixed number of simulation steps advanced per rendered frame
@@ -34,10 +36,22 @@ GPU: required. If no CUDA/ROCm GPU is available this script raises GPUUnavailabl
 fall back to the CPU backends -- CPU-speed dynamics would misrepresent what a real-time viewer is
 supposed to show.
 
-Initial condition parameters (particle count, particle mass, sphere radius) are read once from the
-command line at startup and never change during the run: there is no in-run reconfiguration, no
-rebuilding of the state, and no control surface for it. Simplicity over a feature nobody asked to
-keep live.
+Initial condition parameters (particle count, mass, radius, mass-spectrum shape, virial ratio) are
+read once from the command line at startup and never change during the run: there is no in-run
+reconfiguration, no rebuilding of the state, and no control surface for it. Simplicity over a
+feature nobody asked to keep live.
+
+With --cold, the initial condition is exactly cold_sphere: equal masses, zero velocity, same marker
+size and color as before this script gained a mass spectrum. Without --cold (the default), it is
+random_sphere: a truncated Salpeter mass spectrum (dN/dm ~ m^-alpha, 1-3 massive bodies per
+realization, docs/simulacao-estocastica.md Sec. 2) and, if --virial-q is nonzero, a truncated
+Maxwellian velocity field at that virial ratio Q = 2K/|U| (Sec. 3). --mass is the exact per-particle
+mass with --cold, but only the TARGET MEAN mass of the spectrum otherwise -- the realized mean and
+total mass are read back from the sampled state, never assumed, because the k in {1,2,3} massive-
+body conditioning biases the realized mean about -0.76% below the target (Sec. 2.8). Marker size
+scales as (m_i / mean(m))^(1/3), clamped to a visible range, and marker color ramps from the
+default blue at the mean mass towards gold at the heaviest body realized, so the 1-3 Salpeter-tail
+bodies are visually distinguishable from the rest -- the whole point of turning the spectrum on.
 
 Auto-stop (two criteria, checked every frame): |dE/E0| > 1 (accumulated energy error equals the
 total energy -- the trajectory no longer means anything), or no particle left inside the viewed
@@ -46,11 +60,16 @@ simulation (stops advancing state) but leaves the window, camera and HUD live, w
 message naming which criterion fired and at what simulated time.
 
 Usage:
-    python scripts/realtime.py [--n N] [--mass MASS] [--radius RADIUS]
+    python scripts/realtime.py [--n N] [--mass MASS] [--radius RADIUS] [--cold]
+        [--alpha ALPHA] [--mass-ratio RATIO] [--virial-q Q] [--f-cut F_CUT] [--seed SEED]
 
-Defaults for --n, --mass, --radius match nbody.config (the same cold-sphere setup used elsewhere
-in this project). No upper-bound validation is applied to these arguments by design: if a value
-is large enough to be slow or to exhaust GPU memory, it is allowed to be slow or to fail loudly.
+Defaults for every option match nbody.config. No upper-bound validation is applied to --n, --mass
+or --radius by design: if a value is large enough to be slow or to exhaust GPU memory, it is
+allowed to be slow or to fail loudly. --virial-q is the one exception: random_sphere rejects
+Q > Q_USABLE_COEFF * f_cut**2 (the truncated Maxwellian degenerates past that point,
+docs/simulacao-estocastica.md Sec. 3.4), and that combination is checked here at argument-parsing
+time so it fails with a plain message before the GPU is touched, not as a traceback with the
+window already open.
 """
 from __future__ import annotations
 
@@ -69,7 +88,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 from nbody import config  # noqa: E402
 from nbody.backends import get_backend  # noqa: E402
 from nbody.backends.base import BackendUnavailable  # noqa: E402
-from nbody.initial_conditions import cold_sphere  # noqa: E402
+from nbody.initial_conditions import cold_sphere, random_sphere  # noqa: E402
 from nbody.integrators import integrate  # noqa: E402
 from nbody.observables import total_energy  # noqa: E402
 
@@ -84,7 +103,15 @@ DT_OVER_TFF = 1.0 / 2000.0  # fixed simulation timestep, as a fraction of t_ff (
 TARGET_FPS = 60.0
 VIEW_RADIUS_FACTOR = 4.0  # "viewed volume" and initial camera framing, as a multiple of sphere_radius
 ENERGY_ERROR_LIMIT = 1.0  # |dE/E0| beyond this: the trajectory is no longer physical
-HUD_N_LINES = 5  # fixed HUD line count (4 status lines + 1 freeze-message slot, blank when running)
+HUD_N_LINES = 6  # fixed HUD line count (5 status lines + 1 freeze-message slot, blank when running)
+
+# Marker encoding of mass (--cold bypasses all of this and reuses the literal pre-spectrum values
+# below directly, so its picture is bit-for-bit identical to before random_sphere was wired in).
+MARKER_SIZE_BASE = 4.0  # the size every marker had before the mass spectrum existed
+MARKER_SIZE_MIN = 2.0  # floor: the lightest sampled bodies (~0.28x mean) must stay visible
+MARKER_SIZE_MAX = 20.0  # ceiling: the 1-3 Salpeter-tail bodies (up to ~285x mean) must not become blobs
+BASE_COLOR = (0.4, 0.7, 1.0, 0.9)  # the color every marker had before the mass spectrum existed
+HEAVY_COLOR = (1.0, 0.85, 0.25, 1.0)  # ramp target at the heaviest body realized in this run
 
 # Energy-error panel: fixed-capacity, adaptively decimated history (not a sliding window), so
 # the trace covers the full run since t=0 in constant memory however long the run gets.
@@ -101,11 +128,55 @@ class GPUUnavailable(RuntimeError):
 
 
 def parse_args():
-    parser = argparse.ArgumentParser(description="Real-time cold spherical collapse viewer.")
+    parser = argparse.ArgumentParser(description="Real-time spherical collapse viewer.")
     parser.add_argument("--n", type=int, default=config.N_PARTICLES, help="particle count")
-    parser.add_argument("--mass", type=float, default=config.PARTICLE_MASS, help="mass per particle (kg)")
+    parser.add_argument(
+        "--mass", type=float, default=config.PARTICLE_MASS,
+        help="particle mass (kg): exact per-particle value with --cold; otherwise the TARGET MEAN "
+        "mass of the Salpeter spectrum -- the realized mean is read back from the sampled state "
+        "and is not exactly this value (see docs/simulacao-estocastica.md Sec. 2.8)",
+    )
     parser.add_argument("--radius", type=float, default=config.SPHERE_RADIUS, help="initial sphere radius (m)")
-    return parser.parse_args()
+    parser.add_argument(
+        "--alpha", type=float, default=config.MASS_ALPHA,
+        help="Salpeter mass spectrum exponent, dN/dm ~ m^-alpha; ignored with --cold",
+    )
+    parser.add_argument(
+        "--mass-ratio", type=float, default=config.MASS_RATIO,
+        help="mass spectrum truncation ratio m_max / m_min; ignored with --cold",
+    )
+    parser.add_argument(
+        "--virial-q", type=float, default=config.Q_DEFAULT,
+        help="virial ratio Q = 2K/|U| for the initial velocity field; Q=0 is at rest (cold); "
+        "ignored with --cold",
+    )
+    parser.add_argument(
+        "--f-cut", type=float, default=config.F_CUT_DEFAULT,
+        help="velocity truncation cutoff, as a fraction of the escape speed; ignored with --cold",
+    )
+    parser.add_argument(
+        "--seed", type=int, default=config.SEED,
+        help="RNG seed for particle positions (mass and velocity sampling use their own seeds, "
+        "fixed by config.MASS_SEED and config.VEL_SEED)",
+    )
+    parser.add_argument(
+        "--cold", action="store_true",
+        help="use the cold spherical collapse initial condition (equal masses, zero velocity, "
+        "cold_sphere) instead of the default random_sphere; reproduces the reference run exactly",
+    )
+    args = parser.parse_args()
+
+    if not args.cold and args.virial_q != 0.0:
+        q_max = config.Q_USABLE_COEFF * args.f_cut**2
+        if args.virial_q > q_max:
+            parser.error(
+                f"--virial-q {args.virial_q} exceeds the non-degeneracy bound "
+                f"Q_max = Q_USABLE_COEFF * f_cut**2 = {q_max:.6f} for --f-cut {args.f_cut} "
+                "(the truncated Maxwellian degenerates into the uniform velocity ball past this "
+                "point, docs/simulacao-estocastica.md Sec. 3.4); lower --virial-q or raise --f-cut"
+            )
+
+    return args
 
 
 def select_device() -> torch.device:
@@ -147,11 +218,29 @@ class Viewer:
         self.n = args.n
         self.mass = args.mass
         self.radius = args.radius
+        self.cold = args.cold
+        self.alpha = args.alpha
+        self.mass_ratio = args.mass_ratio
+        self.f_cut = args.f_cut
+        self.seed = args.seed
+        # Q=0.0 for --cold: the initial condition is at rest by construction, independent of
+        # whatever --virial-q was left at its default.
+        self.virial_q = 0.0 if self.cold else args.virial_q
 
-        self.state = cold_sphere(
-            n=self.n, radius=self.radius, particle_mass=self.mass,
-            seed=config.SEED, dtype=DTYPE, device=self.device,
-        )
+        if self.cold:
+            self.state = cold_sphere(
+                n=self.n, radius=self.radius, particle_mass=self.mass,
+                seed=self.seed, dtype=DTYPE, device=self.device,
+            )
+        else:
+            self.state = random_sphere(
+                n=self.n, radius=self.radius, seed=self.seed,
+                mass_spectrum={
+                    "alpha": self.alpha, "ratio": self.mass_ratio, "particle_mass": self.mass,
+                },
+                virial_ratio=self.virial_q, f_cut=self.f_cut,
+                dtype=DTYPE, device=self.device,
+            )
         print(f"compiling GPU kernel for N={self.n} (torch.compile) ...", file=sys.stderr)
         # torch_compiled's one-time compile cost is measured (results/2026/sweep_n.csv) to grow
         # steeply with N: well under a second around N=1000, tens of seconds by N~16000, minutes
@@ -159,12 +248,25 @@ class Viewer:
         self.backend_name, self.backend = select_backend(self.device, self.state)
         print(f"backend selected: {self.backend_name}", file=sys.stderr)
 
-        total_mass = self.n * self.mass
+        # Total mass is read back from the realized state, never assumed as n * mass: with a mass
+        # spectrum the k in {1,2,3} massive-body conditioning biases the realized mean away from
+        # the target (docs/simulacao-estocastica.md Sec. 2.8), and t_ff must be computed from the
+        # realized total, not the nominal one (Sec. 2.10) -- otherwise it, and dt, would be wrong.
+        # Summed in float64: for --cold this is bit-identical to the previous n * mass, because
+        # every fp32 mass here is exactly representable and their count is well within float64's
+        # 53-bit mantissa, so the float64 sum recovers the exact total instead of the fp32-rounded
+        # one a same-dtype reduction would give.
+        self.total_mass = float(self.state.m.detach().to(torch.float64).sum().item())
         volume = (4.0 / 3.0) * math.pi * self.radius**3
-        density = total_mass / volume
+        density = self.total_mass / volume
         self.t_ff = math.sqrt(3.0 * math.pi / (32.0 * config.G * density))
         self.dt = self.t_ff * DT_OVER_TFF
         self.view_radius = VIEW_RADIUS_FACTOR * self.radius
+
+        self.mass_min_real = float(self.state.m.min().item())
+        self.mass_max_real = float(self.state.m.max().item())
+        self.mass_ratio_real = self.mass_max_real / self.mass_min_real
+        self.marker_sizes, self.marker_colors = self._mass_visuals(self.state.m)
 
         self.e0 = total_energy(self.state, softening=config.SOFTENING)
         self.step_count = 0
@@ -183,10 +285,52 @@ class Viewer:
 
         self._build_scene()
 
+    def _mass_visuals(self, m: torch.Tensor) -> tuple[np.ndarray, np.ndarray]:
+        """
+        Per-particle marker size and color from mass, computed once (masses are fixed for the run).
+
+        --cold uses the literal pre-spectrum constants directly rather than deriving them from a
+        mass ratio that happens to be 1.0 everywhere: equal fp32 masses summed and divided back
+        through .mean() do not round-trip to exactly 1.0, and --cold's picture must be bit-for-bit
+        identical to before this script had a mass spectrum, not merely close.
+
+        Otherwise: size ~ (m_i / mean(m))^(1/3), clamped to [MARKER_SIZE_MIN, MARKER_SIZE_MAX] so
+        the 1-3 Salpeter-tail bodies (up to ~285x the mean, docs/simulacao-estocastica.md Sec. 2.5)
+        read as visibly larger without filling the screen, and the lightest bodies (down to ~0.28x
+        the mean) stay visible instead of shrinking to nothing. Color ramps linearly from
+        BASE_COLOR at the mean mass to HEAVY_COLOR at the single heaviest body in this realization,
+        so the ramp always spans its full range regardless of --alpha / --mass-ratio.
+        """
+        n = m.shape[0]
+        if self.cold:
+            sizes = np.full(n, MARKER_SIZE_BASE, dtype=np.float64)
+            colors = np.tile(np.array(BASE_COLOR, dtype=np.float64), (n, 1))
+            return sizes, colors
+
+        m64 = m.detach().to("cpu", dtype=torch.float64).numpy()
+        mean = m64.mean()
+        ratio = np.cbrt(m64 / mean)
+        sizes = np.clip(ratio * MARKER_SIZE_BASE, MARKER_SIZE_MIN, MARKER_SIZE_MAX)
+
+        span = float(ratio.max() - 1.0)
+        t = np.clip((ratio - 1.0) / span, 0.0, 1.0) if span > 1e-12 else np.zeros_like(ratio)
+        base = np.array(BASE_COLOR, dtype=np.float64)
+        heavy = np.array(HEAVY_COLOR, dtype=np.float64)
+        colors = base[None, :] + t[:, None] * (heavy - base)[None, :]
+        return sizes, colors
+
+    def ic_status_line(self) -> str:
+        ic_label = "cold_sphere" if self.cold else "random_sphere"
+        return (
+            f"IC: {ic_label}   M_real: {self.total_mass:.4e} kg   "
+            f"Q_target: {self.virial_q:.3f}   m_max/m_min: {self.mass_ratio_real:.3f}"
+        )
+
     def _build_scene(self):
+        ic_kind = "cold" if self.cold else "random"
         self.canvas = scene.SceneCanvas(
             keys="interactive", size=(1000, 800), show=True, bgcolor="black",
-            title="cold spherical collapse -- real time (GPU, fp32, velocity_verlet)",
+            title=f"{ic_kind} spherical collapse -- real time (GPU, fp32, velocity_verlet)",
         )
         # Two-row grid: 3D view keeps 75% of the height and stays mouse-interactive; the
         # diagnostic plot below is interactive=False so dragging it cannot be mistaken for
@@ -201,7 +345,7 @@ class Viewer:
 
         pos0 = self.state.r.detach().to("cpu").numpy()
         self.markers = scene.visuals.Markers(parent=self.view.scene)
-        self.markers.set_data(pos0, face_color=(0.4, 0.7, 1.0, 0.9), size=4.0, edge_width=0)
+        self.markers.set_data(pos0, face_color=self.marker_colors, size=self.marker_sizes, edge_width=0)
 
         # vispy 0.16 Text does not lay out embedded "\n" correctly against anchor_y="top"
         # (only the last line ends up on screen); use one Text instance per HUD line instead,
@@ -301,7 +445,7 @@ class Viewer:
             self._record_energy()
 
             pos = self.state.r.detach().to("cpu").numpy()
-            self.markers.set_data(pos, face_color=(0.4, 0.7, 1.0, 0.9), size=4.0, edge_width=0)
+            self.markers.set_data(pos, face_color=self.marker_colors, size=self.marker_sizes, edge_width=0)
             self._update_plot()
 
             if self.rel_error > ENERGY_ERROR_LIMIT:
@@ -332,6 +476,7 @@ class Viewer:
 
         lines = [
             f"backend: {self.backend_name}   dtype: float32   N: {self.n}",
+            self.ic_status_line(),
             f"integrator: velocity_verlet   steps/frame: {STEPS_PER_FRAME}   "
             f"dt: {self.dt:.4e} s ({DT_OVER_TFF:.2e} t_ff)",
             f"fps: {self.fps_ema:6.1f}   t = {self.sim_time / self.t_ff:7.4f} t_ff   step {self.step_count}",
@@ -349,6 +494,12 @@ def main():
         # it, leaving a window that renders the initial frame and never advances.
         viewer = Viewer(args)
     except GPUUnavailable as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        sys.exit(1)
+    except ValueError as exc:
+        # Defense in depth: parse_args() already rejects the known --virial-q/--f-cut degeneracy
+        # before this point, but random_sphere (e.g. via a too-small --n) can still raise. Either
+        # way this must fail here, before the window opens, not as a bare traceback.
         print(f"error: {exc}", file=sys.stderr)
         sys.exit(1)
     app.run()

@@ -35,6 +35,11 @@ GIF_COLORS = 64  # the scene is a dark field with two accent colours; 64 is plen
 
 def main() -> None:
     args = realtime.parse_args()
+    # This script's whole purpose (see module docstring) is the cold collapse: figures/collapse.gif
+    # and the numbers quoted for it in README.md are pinned to cold_sphere. Force --cold here,
+    # regardless of what was passed on this script's own command line, so the recording can never
+    # silently drift to random_sphere just because realtime.py's own default changed.
+    args.cold = True
     viewer = realtime.Viewer(args)
 
     n_frames = int(round(END_TFF / (STEPS_PER_GIF_FRAME * realtime.DT_OVER_TFF)))
@@ -49,6 +54,7 @@ def main() -> None:
         t_tff = viewer.sim_time / viewer.t_ff
         viewer.hud.text = [
             f"backend: {viewer.backend_name}   dtype: float32   N: {viewer.n}",
+            viewer.ic_status_line(),
             f"integrator: velocity_verlet   dt: {viewer.dt:.4e} s "
             f"({realtime.DT_OVER_TFF:.2e} t_ff)",
             f"t = {t_tff:7.4f} t_ff   step {viewer.step_count}",
