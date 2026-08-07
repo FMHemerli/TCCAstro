@@ -89,6 +89,13 @@ VEL_MODE_DEFAULT = 1.0754
 VEL_REJECT_FRACTION = 2.5529e-2
 VEL_LAMBDA_SD = 1.291e-2
 
+# --- collisions, detection only (docs/simulacao-estocastica.md, Sec. 4 / Sec. 8) ---
+CHI_DEFAULT = 0.1
+R_REF_DEFAULT = 5.0e-3
+DT_COLLISION = 1.25e-4
+N_STEPS_COLLISION = 50400
+COLLISION_SEED = 20190225
+
 
 @dataclass(frozen=True)
 class CollapseParams:
