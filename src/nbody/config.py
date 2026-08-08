@@ -89,6 +89,26 @@ VEL_MODE_DEFAULT = 1.0754
 VEL_REJECT_FRACTION = 2.5529e-2
 VEL_LAMBDA_SD = 1.291e-2
 
+# --- collisions, detection only (docs/simulacao-estocastica.md, Sec. 4 / Sec. 8) ---
+CHI_DEFAULT = 0.1
+R_REF_DEFAULT = 5.0e-3
+DT_COLLISION = 1.25e-4
+N_STEPS_COLLISION = 50400
+COLLISION_SEED = 20190225
+
+# --- collisions, resolution (docs/simulacao-estocastica.md, Sec. 4.6-4.10 / Sec. 8) ---
+# NOTE: DT_COLLISION / N_STEPS_COLLISION above are the stage-2 (detection-only) sweep values
+# and remain referenced by scripts/collision_rate.py, which is out of this change's scope.
+# The 2026-08-07 revision of the spec REMOVES DT_COLLISION as a project symbol for stage-3
+# (resolved) runs and fixes dt = DT_COLLAPSE, N_STEPS_COLLISION = 12600 instead; that stage-3
+# campaign wiring (a config.CollisionParams / RUN_COLLISION analogue to RUN_COLLAPSE) does not
+# exist yet and is not added here -- see the final report.
+MAP_X_CLAMP = 1.0e12
+MAP_ELASTIC_WEIGHT = 3.0
+COLLISION_DRAWS_PER_EVENT = 2
+FRAG_F_MIN = 0.1
+FRAG_ETA = 0.0
+
 
 @dataclass(frozen=True)
 class CollapseParams:

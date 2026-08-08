@@ -197,6 +197,38 @@ Forma **inaceitável**: confiar em `dsq > 0` por causa de `eps`; ou multiplicar 
 produzindo `inf * 0 = nan`; ou usar `eps` pequeno mas não nulo como substituto de excluir a
 diagonal.
 
+### 2.6 Softening e raio de contato — o que muda quando há colisões
+
+**Subseção acrescentada em 2026-08-08** (emenda pedida pela Seção 9.2 de
+`docs/simulacao-estocastica.md`). A Seção 2.2 descreve o que `eps` faz num sistema de massas
+pontuais que **nunca se tocam**. Com colisões, a semântica de `eps` muda **qualitativamente**, e o
+ponto de virada é a comparação entre o raio de contato do par, `R_i + R_j`, e o próprio `eps`.
+
+**Caso `R_i + R_j < eps` — é o regime adotado pelo projeto** (`chi = 0.1`, isto é
+`R_ref = 0.1 eps`). As colisões ocorrem **dentro** da região regularizada. Consequências, e nenhuma
+delas é um detalhe numérico:
+
+- a velocidade de impacto e a profundidade do poço de par são as do potencial de **Plummer**, não as
+  de massas pontuais. O par chega ao contato com **menos** energia do que a queda newtoniana daria;
+- concretamente, no núcleo do colapso deste projeto o par cai desde a separação interpartícula
+  local (`0.0703 m`, Seção 4.3), que já está **dentro** do raio de suavização (`eps = 0.05 m`), e
+  chega com apenas `~40%` da energia de uma queda desde o infinito **[T]**;
+- **qualquer argumento que suponha "queda desde o infinito" para estimar a velocidade de contato
+  está errado neste regime.** Essa premissa falsa custou três retratações em
+  `docs/simulacao-estocastica.md` (Seções 4.6.1, 4.10 e 4.12), e é a razão de esta subseção existir.
+
+**Caso `R_i + R_j > eps`.** O contato acontece antes de o softening jamais atuar: `eps` deixa de
+regularizar coisa alguma e o sistema **muda de regime**, não de precisão. Medido, com `chi = 1`:
+`87` colisões por partícula por rebote, e o núcleo coalesce num único rebote **[M]**. Está **vetado**
+pela Seção 4.2 daquele documento.
+
+**Consequência normativa.** Com colisões ligadas, `eps` deixa de ser um parâmetro apenas numérico e
+passa a ser, também, o que fixa a **escala de energia do encontro**. Ele já devia constar de todo
+artefato de saída e de toda legenda (Seção 2.4); com colisões, omiti-lo torna o resultado
+ininterpretável. E `eps = 0` com colisões é **recusado com `ValueError`** — não por rigor, mas
+porque um slot morto (`m = 0`) coincidente com um corpo vivo produz `0 * inf = NaN` e a simulação
+inteira vira `NaN` (`INV-28`; Seção 5.2 daquele documento).
+
 ---
 
 ## 3. Os quatro integradores
@@ -538,10 +570,48 @@ Critérios, todos verificados numericamente nesta configuração:
 1. **Não perturbar a estrutura inicial.** `eps/R_0 = 8.06e-3`. A energia potencial inicial difere da
    não-suavizada por `3.4e-4` em termos relativos. **[M]**
 2. **Resolver o núcleo colapsado.** No instante de máxima compressão o raio de meia-massa é
-   `r_half,min = 0.3472 m` **[M]**; a densidade numérica local no núcleo é `~1.4e3 m⁻³`, isto é,
-   separação interpartícula local `~0.089 m`. Com `eps = 0.05 m`, o softening vale `~0.56` da
-   separação local no instante mais denso. **Este é o limite de resolução do estudo e deve ser
-   declarado como tal:** a estrutura do núcleo abaixo de `~0.05 m` não é resolvida.
+   `r_half,min = 0.3472 m` **[M]**; a densidade numérica local no núcleo é **`2888 m⁻³`** **[M]**,
+   isto é, separação interpartícula local **`0.0703 m`**. Com `eps = 0.05 m`, o softening vale
+   **`~0.71`** da separação local no instante mais denso. **Este é o limite de resolução do estudo e
+   deve ser declarado como tal:** a estrutura do núcleo abaixo de `~0.05 m` não é resolvida.
+
+   > # CORREÇÃO 2026-08-08 — ERRO DE FATOR `2` NA DENSIDADE DE NÚCLEO
+   >
+   > **Os valores anteriores eram `~1.4e3 m⁻³`, `~0.089 m` e `~0.56`, e estavam errados.** A
+   > densidade de núcleo foi **medida** na campanha do estágio 2 (2026-08-07; Seção 4.1.1 de
+   > `docs/simulacao-estocastica.md`) e vale `2888.3 m⁻³` **[M]**. O valor antigo subestimava a
+   > densidade por um **fator `2` exato**, e é ele, não o cálculo direto, que estava errado.
+   >
+   > **Conferência independente, a partir de números que já estavam neste documento** **[T]**:
+   > metade da massa está dentro de `r_half,min`, logo
+   >
+   > ```
+   > n_nucleo = (N/2) / ( (4/3) pi r_half,min^3 )
+   >          = 500 / ( (4/3) pi (0.3457)^3 )  =  2889 m^-3
+   > separacao local = n^(-1/3) = 0.0703 m
+   > eps / separacao = 0.05 / 0.0703 = 0.711
+   > ```
+   >
+   > (Usa-se `r_half,min = 0.3457 m`, o mínimo amostrado **a cada passo**; sobre a grade de saída de
+   > `OUT_DT = 1e-2 s` o mínimo é `0.3472 m`, `0.4%` mais raso — ver a nota de amostragem em
+   > `INV-9`.) A conta reproduz o valor medido a `0.02%`. A antiga, `1426 m⁻³`, é exatamente metade
+   > dela e `1426^(-1/3) = 0.0888 m ≈ 0.089`, o que confirma que o erro estava na densidade e se
+   > propagou daí para a separação e para a razão.
+   >
+   > **Consequência física, e ela não é cosmética.** O softening não é `56%` da separação
+   > interpartícula no instante mais denso: é **`71%`**. O núcleo é **menos** resolvido do que este
+   > documento afirmava, e a declaração de limite de resolução do item 2 fica **mais** necessária,
+   > não menos. **[M]**
+   >
+   > **Por que isto importa fora daqui.** Toda taxa de colisão de `docs/simulacao-estocastica.md`
+   > depende desta densidade (Seções 4.1, 4.12), e a premissa da "queda desde o infinito", refutada
+   > lá (Seção 4.6.1), depende da separação local `0.070 m` ser **comparável a `eps = 0.05 m`** — o
+   > que é verdade com `0.0703` e seria bem menos evidente com `0.089`. Os dois documentos estão
+   > agora consistentes.
+   >
+   > **O que NÃO muda.** `eps = 0.05 m` continua fixado, e a robustez do item 4 — varredura de `eps`
+   > por fator `5` — continua valendo sem alteração: ela é uma medição de `t_collapse` e
+   > `r_half,min`, não da densidade.
 3. **Limitar a frequência máxima** (Seção 2.2, item 3), viabilizando `dt` fixo.
 4. **Robustez do resultado ao valor de `eps`.** Verificado **[M]** varrendo `eps ∈ {0.02, 0.05, 0.1}`
    (fator 5) e `dt ∈ {2e-3, 1e-3, 5e-4, 2.5e-4}` (fator 8), 12 execuções de Verlet fp64 no colapso
@@ -1025,6 +1095,22 @@ vez de `r_j - r_i`) ou uso de `m_i` onde deveria estar `m_j`. **Bloqueante.**
 
 ### `INV-3` — Momento angular total
 
+> # RESSALVA DE APLICABILIDADE — acrescentada em 2026-08-08
+>
+> **`INV-3` NÃO SE APLICA a execuções com fusão ou fragmentação.** Ele continua em pleno vigor em
+> tudo o mais: sem colisões, e também com colisões **exclusivamente elásticas**, onde o mapa de
+> choque conserva `L` exatamente.
+>
+> **Por quê, e não é uma questão de tolerância.** A fusão e a fragmentação **destroem momento
+> angular orbital** por `-mu (dr x u)` exatamente — o spin do par, que um modelo de massas pontuais
+> não representa. `L_orb` **salta** a cada evento, por construção do modelo e não por erro do
+> integrador. Aplicar `INV-3` a uma execução com fusão **reprova uma implementação correta**.
+>
+> **Substituto obrigatório:** `INV-24` de `docs/simulacao-estocastica.md`, sobre
+> `L_total = L_orb + L_spin`, com o acumulador `L_spin` recebendo `mu (dr(t*) x u)` a cada evento.
+> A mesma tolerância relativa (`1e-12` sobre `L_SCALE`) transfere-se; o que muda é a **grandeza
+> conservada**, não a exigência.
+
 **Enunciado:** `symplectic_euler` e `velocity_verlet` conservam `L` exatamente em aritmética exata;
 `euler` e `rk4` **não**. Demonstrações na Seção 3. **[T]**
 
@@ -1058,6 +1144,32 @@ teste de correção mais informativo por unidade de custo do conjunto.
 **Bloqueante.**
 
 ### `INV-4` — Energia total por integrador
+
+> # RESSALVA DE APLICABILIDADE — acrescentada em 2026-08-08
+>
+> **`INV-4` NÃO SE APLICA a execuções com fusão ou fragmentação.** Em vigor sem alteração para o
+> problema suave e para colisões **exclusivamente elásticas**.
+>
+> **Por quê.** `velocity_verlet` é simplético e conserva exatamente um hamiltoniano sombra
+> `H_h = H + O(h²)`; é disso, e não de nenhuma propriedade de `E`, que decorre a banda limitada de
+> `|ΔE/E₀|`. O mapa de colisão **não é o fluxo-`h` de hamiltoniano suave algum**: a análise de erro
+> para trás não atravessa o evento e `H_h` é redefinido a cada um. Com fusão, `E_mec = K + U` exibe
+> uma **escada** de degraus finitos — não há banda limitada, não há oscilação em torno de valor
+> fixo, e **a razão "pico/final ≈ 60" que distingue simpléticos de não simpléticos deixa de existir
+> como teste.** Qualquer critério da tabela de aceitação abaixo aplicado a uma execução com fusão
+> **reprova uma implementação correta**.
+>
+> **Substituto obrigatório:** `INV-23` de `docs/simulacao-estocastica.md`, sobre
+> `E_total = K + U + E_int`, com duas ressalvas que aquele documento fixa e que **não** podem ser
+> omitidas: `E_total` não é exatamente conservada (o resíduo de terceiro corpo é declarado e medido,
+> `~1.2e-3 |E_0|` acumulados em `3 t_ff` **[M]**), e os critérios só valem **antes** do runaway
+> (`max_i m_i / M_real < 0.10`). Os valores **[M]** deste documento **não se transferem**: a
+> trajetória é outra.
+>
+> **A comparação entre integradores continua sendo feita SEM colisões.** As colisões são um estudo
+> de física, não um banco de teste de integradores; misturar os dois papéis anula os dois. Nenhuma
+> execução com fusão pode sustentar afirmação sobre conservação de energia mecânica, nem comparação
+> numérica direta com `results/2026/longrun_energy.csv`.
 
 **Condição de validade:** as afirmações de "oscilação limitada" para os métodos simpléticos valem
 enquanto `dt` for pequeno frente a **todas** as escalas de tempo do sistema (Seção 4.4). Elas são
@@ -1424,7 +1536,27 @@ errado nos estágios de RK4 (Seção 3.4), ou fusão indevida dos laços em `sym
 
 1. Em cada instante de saída, calcular o centro de massa `c(t) = (1/N) * sum_i r_i` e as distâncias
    `d_i = |r_i - c|`.
-2. `r_half(t) := ` a `(N/2)`-ésima menor distância (índice `N//2 - 1` no vetor ordenado, base 0).
+2. `r_half(t) := ` a **mediana de MASSA** das distâncias: ordenar por `d_i`, acumular `m_i`, e tomar
+   o primeiro `d` em que a massa acumulada atinge `M_tot / 2`.
+
+   > # EMENDA 2026-08-08 — `r_half` é mediana de MASSA, não de contagem
+   >
+   > O enunciado anterior era *"a `(N/2)`-ésima menor distância (índice `N//2 - 1`, base 0)"*, isto é,
+   > a mediana de **contagem**. Ela só coincide com a de massa quando **todas as massas são iguais**.
+   > Com o espectro de massas (`m_max/m_min = 223`) as duas diferem em `~10%`, e a de contagem passa
+   > a medir a mediana errada — um observável que responde a onde estão os **corpos**, não a onde
+   > está a **massa**. Justificativa completa na Seção 5.3 de `docs/simulacao-estocastica.md`.
+   >
+   > **A mudança de código JÁ ESTÁ FEITA e commitada** (`src/nbody/observables.py:70`, via
+   > `argsort` + `cumsum` + `searchsorted`); o que faltava era esta emenda ao texto. `INV-29`
+   > permanece em vigor como teste de **regressão** — o que ele guarda é que ninguém volte à mediana
+   > de contagem.
+   >
+   > **NENHUM VALOR PUBLICADO MUDOU, e isto é verificável, não uma esperança.** Para massas iguais e
+   > `N` par as duas definições são **bit a bit idênticas** — a massa acumulada atinge `M_tot/2`
+   > exatamente no `(N/2)`-ésimo elemento. Logo `IC_R_HALF_0 = 4.881251` e
+   > `COLLAPSE_R_HALF_MIN = 0.3472` continuam válidos sem reexecução, e toda a tabela de robustez de
+   > `eps` e `dt` da Seção 4.3 continua válida.
 3. `k* := argmin_k r_half(t_k)`.
 4. Refinar por parábola nos três pontos `(t_{k*-1}, t_{k*}, t_{k*+1})`:
    `t_collapse = t_{k*} + (OUT_DT/2) * (y_{-1} - y_{+1}) / (y_{-1} - 2*y_0 + y_{+1})`.
@@ -1455,6 +1587,18 @@ expoente errado na lei de força, produzem desvios de dezenas de por cento a ord
 
 Critério secundário (mais frouxo, informativo): `r_half,min ∈ [0.30, 0.40] m`.
 
+> **Nota de amostragem, acrescentada em 2026-08-08. `COLLAPSE_R_HALF_MIN = 0.3472` é um mínimo
+> SUBAMOSTRADO.** Ele é obtido sobre a grade de saída de `OUT_DT = 1e-2 s`, isto é, **a cada `20`
+> passos** com `dt = 5e-4`. Amostrado **a cada passo**, o mínimo é `0.3457 m` — `0.4%` mais fundo
+> **[M]**.
+>
+> **Isto não é discordância entre execuções, e não deve ser lido como tal.** É a diferença esperada
+> entre amostrar uma função com mínimo agudo a cada `20` passos e a cada passo: o mínimo verdadeiro
+> cai entre dois pontos da grade grossa. `0.3472` permanece o valor **normativo** — é ele que a
+> definição operacional acima produz, e é contra ele que `INV-9` testa. Quem medir a cada passo, ou
+> ler a densidade de núcleo da Seção 4.3 (que usa `0.3457`), deve saber por que os dois números
+> diferem em vez de procurar um erro.
+
 **Validade em fp32.** `t_collapse` e `r_half,min` são observáveis **agregados** (não dependem da
 identidade individual das partículas) e por isso sobrevivem à divergência caótica. Medido **[M]**,
 Verlet, `RUN_COLLAPSE`:
@@ -1473,9 +1617,42 @@ teste que valida a implementação fp32**, no lugar da comparação de trajetór
 
 ### `INV-10` — Limitação inferior da energia potencial
 
-`U(t) >= -G m² N(N-1)/(2 eps) = -6.6674e14 J` para todo `t`, por construção do núcleo de Plummer.
+**Forma geral, válida para massas quaisquer** (emenda de 2026-08-08):
+
+```
+U(t)  >=  U_MIN_BOUND  =  - G ( M_real^2 - sum_i m_i^2 ) / ( 2 eps )        [T]
+```
+
+Para **massas iguais** isto reduz-se exatamente à forma anterior,
+`-G m² N(N-1)/(2 eps) = -6.6674e14 J`, que continua sendo o valor em vigor em `RUN_COLLAPSE`.
 **[T]** Violação indica `eps` não aplicado no potencial. Teste barato, executar em todo passo
 amostrado, ambas as precisões.
+
+> # EMENDA 2026-08-08 — a fórmula antiga NÃO é a cota com massas desiguais
+>
+> O enunciado anterior era `U >= -G m² N(N-1)/(2 eps)`, com um `m²` único. Ele pressupõe massas
+> iguais em dois lugares ao mesmo tempo — no `m²` e no `N(N-1)` — e **deixa de ser uma cota** assim
+> que as massas diferem: conforme a variância das massas, ele a **subestima ou a superestima**, e
+> nos dois casos o invariante para de fazer o que existe para fazer.
+>
+> **Derivação, em uma linha.** Cada par contribui no mínimo `-G m_i m_j / eps` (o denominador
+> `sqrt(d² + eps²)` é mínimo em `d = 0`), logo
+>
+> ```
+> U  >=  - (G/eps) * sum_{i<j} m_i m_j  =  - (G/eps) * ( (sum_i m_i)^2 - sum_i m_i^2 ) / 2
+> ```
+>
+> que é a forma acima. **[T]** Com `m_i = m` para todo `i`, `M_real² - sum m_i² = m²(N² - N)`, e
+> recupera-se `-G m² N(N-1)/(2 eps)` **exatamente** — não aproximadamente.
+>
+> **Por que o erro tem sinal indefinido.** `sum_i m_i²` é dominado pelos corpos massudos; com o
+> espectro de massas do projeto (`m_max/m_min = 223`, `1 <= k <= 3` corpos massudos por realização)
+> ele varia fortemente entre realizações, enquanto `M_real` varia pouco (`CV = 9.24%`). Substituir
+> `m` por `<m>` na fórmula antiga não conserta: a cota depende do **segundo momento** da
+> distribuição de massas, não do primeiro.
+>
+> **Implementação.** `observables.scales_from_state` já devolve `u_min_bound` nesta forma, calculado
+> da massa **realizada**. Nenhum valor de `RUN_COLLAPSE` muda, porque lá as massas são iguais.
 
 ---
 
@@ -1618,6 +1795,18 @@ não simpléticos e é o argumento que sustenta a recomendação final.
 - Nada sobre relaxação de dois corpos ou evaporação: em `3 t_ff` o sistema percorreu `~3` tempos de
   cruzamento, contra um tempo de relaxação de `~0.1 N / ln N ≈ 14` tempos de cruzamento. O sistema
   **não** está relaxado ao fim de `RUN_COLLAPSE`. **[A]** — estimativa padrão, não medida aqui.
+- **Acrescentado em 2026-08-08.** Nada sobre relaxação de dois corpos **ou segregação de massa** a
+  partir de execuções com **espectro de massas** em `3 t_ff`. A tentação é específica e previsível:
+  com massas desiguais, ver corpos massudos no centro convida a escrever "segregação de massa". O
+  horizonte não sustenta a afirmação. O tempo de relaxação por segregação é menor que o de relaxação
+  geral por um fator `~m_max/<m> = 285`, o que ainda deixa a escala **acima** dos `~3` tempos de
+  cruzamento percorridos — e esse fator é **[A]**, estimativa padrão, **não medido neste projeto**.
+  Concentração central de corpos massudos observada em `3 t_ff` é, até prova em contrário, condição
+  inicial e colapso, não relaxação.
+- **Acrescentado em 2026-08-08.** Nada sobre conservação de energia mecânica, nem comparação
+  numérica com `results/2026/longrun_energy.csv`, nem classificação de integradores por
+  comportamento energético, a partir de execuções com **fusão ou fragmentação** — ver as ressalvas de
+  aplicabilidade de `INV-3` e `INV-4`. A comparação entre integradores é feita **sem colisões**.
 
 ---
 
@@ -1729,3 +1918,35 @@ COLLAPSE_T_OVER_TFF   = 1.0361         # adimensional
     (`|| sum_i r_i || / (N * eps_prec * R_0) <= 1`, Seção 5.5), e não pela cota absoluta `1e-13 m`
     da revisão anterior, que violava a própria regra da Seção 6.3 e era intestável em fp32. Medido
     `0.116` (NumPy) e `0.140` (torch) em fp64, `0.029` a `0.109` em fp32.
+
+### Emendas de 2026-08-08 — extensões estocásticas
+
+As extensões estocásticas do projeto (espectro de massas, velocidades térmicas, colisões) estão
+especificadas em **`docs/simulacao-estocastica.md`**, que **estende** este documento e não o revoga.
+`INV-1` a `INV-10` **permanecem em vigor**, com as emendas abaixo; aquele documento acrescenta
+`INV-11` em diante. Onde os dois divergirem sobre a física do **problema suave** — equações de
+movimento, softening, integradores, `RUN_COLLAPSE`, `RUN_CONVERGENCE` — **este documento prevalece**.
+
+12. **A densidade de núcleo estava errada por um fator `2`, e foi corrigida** (§4.3, item 2):
+    `~1.4e3 m⁻³` → **`2888 m⁻³`** **[M]**, separação local `~0.089 m` → **`0.0703 m`**, e o softening
+    passa a valer **`~0.71`** da separação local no instante mais denso, não `~0.56`. O valor novo é
+    medido, e confere com `(N/2)/((4/3)π r_half,min³)` a `0.02%`. **O núcleo é menos resolvido do
+    que este documento afirmava**, e toda taxa de colisão do outro documento depende deste número.
+13. **`r_half` é a mediana de MASSA**, não de contagem (`INV-9`). Para massas iguais e `N` par as
+    duas são **bit a bit idênticas**, de modo que `IC_R_HALF_0 = 4.881251` e
+    `COLLAPSE_R_HALF_MIN = 0.3472` continuam válidos sem reexecução. A mudança de código já estava
+    feita; faltava a emenda ao texto. E `COLLAPSE_R_HALF_MIN` é um mínimo **subamostrado**: a cada
+    passo ele é `0.3457`, `0.4%` mais fundo **[M]** — diferença de amostragem, não de execução.
+14. **`INV-10` ganhou a forma geral** `U >= -G (M_real² - sum_i m_i²)/(2 eps)`, que se reduz
+    **exatamente** à antiga para massas iguais. A fórmula anterior não era uma cota com massas
+    desiguais: ela depende do **segundo momento** da distribuição de massas, e substituir `m` por
+    `<m>` não conserta.
+15. **`INV-3` e `INV-4` NÃO se aplicam a execuções com fusão ou fragmentação**, e os substitutos
+    são `INV-24` (`L_total = L_orb + L_spin`) e `INV-23` (`E_total = K + U + E_int`). Sem essa
+    ressalva, um teste **correto** deste documento reprova uma implementação **correta** com
+    colisões. Com colisões **exclusivamente elásticas**, os dois continuam em pleno vigor.
+16. **A semântica de `eps` muda qualitativamente quando há contato** (nova §2.6). Com
+    `R_i + R_j < eps` — o regime adotado — as colisões ocorrem **dentro** da região regularizada e o
+    par chega ao contato com `~40%` da energia de uma queda desde o infinito. **Argumentos baseados
+    em "queda desde o infinito" são inválidos neste regime**, e custaram três retratações no outro
+    documento.
