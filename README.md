@@ -7,19 +7,69 @@
 ![NumPy](https://img.shields.io/badge/NumPy-013243?logo=numpy&logoColor=white)
 [![License: AGPL v3](https://img.shields.io/badge/License-AGPL_v3-blue.svg)](LICENSE)
 
-Simulação de n-corpos gravitacional com comparação de desempenho entre métodos de integração e arquiteturas de hardware. O repositório consolida o trabalho de 2019 (implementação em Numba com GPU NVIDIA) com a modernização de 2026 (PyTorch com Triton, suporte GPU AMD).
+## A Simulação
 
-O trabalho de 2019 foi desenvolvido como Trabalho de Conclusão de Curso da Licenciatura em Física da Universidade Federal do Espírito Santo, sob orientação do **Prof. Dr. Roberto Colistete Júnior**. A monografia completa está disponível no [site do curso de Física da UFES em Alegre](https://fisica.alegre.ufes.br/sites/fisica.alegre.ufes.br/files/field/anexo/numba_agregacao_materia_flavio_m_s_hemerli_tcc_lic_fisica_alegre_20190711.pdf) [HEMERLI 2019].
+Simulação de colisão em n-corpos com mil partículas de massas heterogêneas que colapsa sob gravidade e exibe um fenômeno emergente: um corpo cresce acumulando massa, absorvendo os demais, sem limite estrutural.
+
+**Mil corpos, massas variadas**: A distribuição segue um espectro tipo Salpeter, $dN/dm \propto m^{-2.35}$, truncado para garantir um a três corpos massudos por realização. As velocidades iniciais são maxwellianas isotrópicas, parametrizadas pela razão virial $Q = 2K/|U|$, em regime que preserva forte ligação gravitacional.
+
+**Colisão como evento discreto**: Um detector de contato varrido captura encontros enquanto os corpos se aproximam. Cada colisão resolve em um de três desfechos, sorteado com probabilidades enviesadas pela violência do choque:
+
+- **choque elástico**: conserva energia, momento e momento angular exatamente;
+- **fusão** (2 → 1): dois corpos coalescem em um único corpo de massa combinada;
+- **fragmentação** (2 → 2): o par se quebra em dois fragmentos com massas sorteadas.
+
+**O resultado**: quatro sementes de colisão sobre uma mesma realização de posições, 3 tempos de queda livre, N = 1000 corpos. Medido em 2026-08-08:
+
+- **Transição para crescimento descontrolado**: entre 1,95 e 1,99 $t_{ff}$
+- **Duração da transição**: entre 0,54 e 0,70 $t_{ff}$  
+- **Corpo dominante**: 29 % a 32 % de toda a massa
+- **Corpos restantes**: aproximadamente 780 corpos vivos
+- **Conservação**: massa e momento exatos, desvio máximo 2,4×10⁻¹⁶ em 12.601 passos
+
+O modelo não tem sumidouro de massa. A fragmentação conserva a massa do par e a fusão apenas a concentra, logo a física não fornece teto de massa para corpo algum. Esse crescimento não é defeito — é consequência estrutural do modelo, e é falsificável: alterações em $\chi$ (raio de contato) ou na forma do mapa de regime devem produzir padrão diferente ou impedir o fenômeno.
+
+O que essas quatro execuções testam é a robustez às escolhas estocásticas do modelo de colisão, não a robustez entre realizações: a condição inicial é a mesma nas quatro, e o crescimento descontrolado é um fenômeno de núcleo, cuja taxa de encontros depende das flutuações locais de densidade que a realização fixa. Variar a semente de posições continua por fazer, e a dispersão pequena entre as quatro (4 % no valor final) é indício de que é a condição inicial, e não o sorteio, que fixa o desfecho.
+
+## Como o Trabalho foi Feito
+
+**Documento normativo escrito antes do código.** Antes de qualquer implementação, a Seção 4 de `docs/simulacao-estocastica.md` fixou a física: definições de colisão, regime de desfecho, algoritmo de detecção varrida, conservação exigida. Cada constante, cada tolerância, cada critério de aceitação necessários aos testes estão no documento. Todo erro nele seria encontrado pelos testes.
+
+**Testes escritos sem ler a implementação.** A suite de testes foi redigida por agente que leu o documento normativo mas não leu o código de `src/nbody/collisions.py`. O resultado: 308 testes, 308 passando. As divergências iniciais foram todas de construção dos próprios testes, não de bugs de código. Além disso, a suite independente descobriu uma inconsistência interna do documento: uma seção exibia um invariante que outra seção já havia revogado.
+
+**Dois erros reais foram achados por medição.** 
+
+1. O parâmetro de regime $x$ deveria incluir um termo de energia gravitacional que o mantivesse baixo, regulando o crescimento. Implementação fiel ao documento o carregou e o executou. Medição mostrou: não funcionava. Pior: aumentava o crescimento em vez de contê-lo. Análise revelou que o termo nunca fora válido — a premissa sobre queda isolada de dois corpos desde o infinito não se aplica no núcleo colapsado (a densidade local é alta, e o poço de Plummer é raso). O termo foi retirado (Seção 4.6.1 do documento).
+
+2. O mapa de regime usava um softmax com dois parâmetros `(b, w)` marcados como pendentes de calibração. A calibração exigida não existia — nenhuma campanha futura a produziria. O mapa foi rescrito como a mesma forma em `w = 1, b = ln 3`, sem transcendentais, sem parâmetros a calibrar (Seção 4.7 revisada). Três operações básicas no lugar de `exp`, `log`, `log-sum-exp`.
+
+**Previsão escrita antes de medir, que falhou — e levou ao entendimento correto do modelo.** O documento previu que o corpo dominante terminaria com cerca de 3 vezes a massa média, ou 1% da massa total. Medição mostrou 321 vezes a massa média, 32% da massa total — duas ordens de grandeza acima. 
+
+A investigação começou com o termo gravitacional em $x$: se o termo causava o crescimento, retirá-lo deveria contê-lo. Retirou e rodou de novo. Falhou de novo, com a massa máxima no mesmo valor. Agora $x$ não dependia mais de massa alguma, então havia um segundo mecanismo.
+
+A questão foi fechada por contagem: houve 226 fusões na execução, mas montar aquele corpo por fusão exclusiva exigiria uma árvore binária de 320 eventos. Logo não foi a fusão que o construiu. O que aconteceu foi **fragmentação**: ao repartir um par muito desigual (um corpo massudo colidindo com um leve), o modelo devolve dois corpos, e o maior deles é grande. Repetido muitas vezes, esse mecanismo concentra massa. 
+
+A descoberta é que o modelo não tem sumidouro de massa: a fragmentação conserva a massa do par e a fusão só concentra, portanto não existe teto de massa para valor nenhum de parâmetro nenhum. É consequência estrutural, não defeito. A previsão foi então reescrita (Seção 4.13.6 do documento) para descrever o crescimento em vez de negá-lo, e continua falsificável: alterar $\chi$ (raio de contato) ou a forma do mapa deve produzir padrão diferente ou impedir o fenômeno.
 
 ![Colapso frio de uma esfera de 1000 partículas, de t = 0 até pouco depois da primeira passagem pelo centro de massa](figures/collapse.gif)
 
-Colapso frio de uma esfera de N = 1000 partículas, integrado com velocity Verlet em fp32 na GPU, de t = 0 até t = 1,4 t_ff. A esfera contrai sob a própria gravidade, atinge compressão máxima na primeira passagem pelo centro de massa em t ≈ 1,03 t_ff e volta a se dispersar. O painel inferior acompanha o erro relativo de energia |dE/E₀| em escala logarítmica, com a linha laranja marcando a tolerância de 5% adotada em 2019. O erro sobe abruptamente na passagem pelo centro, onde as separações entre pares são mínimas e a força varia mais rápido — de 4,2·10⁻⁷ em t = 0,81 t_ff para 8,6·10⁻⁴ no cruzamento — e em seguida recua para cerca de 10⁻⁶. Essa injeção e devolução de erro em torno do cruzamento é a assinatura de um integrador simplético; o que não se vê nesta janela curta é que o erro permanece limitado em banda ao longo de dezenas de tempos de queda livre, comportamento medido e reportado na Parte 2. Gerado por [`scripts/capture_collapse_gif.py`](scripts/capture_collapse_gif.py) a partir do visualizador em [`scripts/realtime.py`](scripts/realtime.py).
+Colapso frio de uma esfera de N = 1000 partículas, integrado com velocity Verlet em fp32 na GPU, de t = 0 até t = 1,4 $t_{ff}$. A esfera contrai sob a própria gravidade, atinge compressão máxima na primeira passagem pelo centro de massa em t ≈ 1,03 $t_{ff}$ e volta a se dispersar. O painel inferior acompanha o erro relativo de energia |dE/E₀| em escala logarítmica, com a linha laranja marcando a tolerância de 5% adotada em 2019. O erro sobe abruptamente na passagem pelo centro, onde as separações entre pares são mínimas e a força varia mais rápido — de 4,2·10⁻⁷ em t = 0,81 $t_{ff}$ para 8,6·10⁻⁴ no cruzamento — e em seguida recua para cerca de 10⁻⁶. Essa injeção e devolução de erro em torno do cruzamento é a assinatura de um integrador simplético; o que não se vê nesta janela curta é que o erro permanece limitado em banda ao longo de dezenas de tempos de queda livre, comportamento medido e reportado na Parte 2 abaixo. Gerado por [`scripts/capture_collapse_gif.py`](scripts/capture_collapse_gif.py) a partir do visualizador em [`scripts/realtime.py`](scripts/realtime.py).
 
-## Enquadramento do problema
+---
 
-A simulação tem como objetivo demonstrar a diferença de tempo de execução entre diferentes métodos de implementação. Para isso modela-se o problema de n-corpos gravitacional com N partículas providas de massa, mas desprovidas de volume, carga ou qualquer outra propriedade física, atraindo-se exclusivamente pela força gravitacional ao longo de um número definido de iterações, e verifica-se a validade da simulação igualando a energia total do sistema à energia potencial gravitacional total do sistema no passo 0.
+## Contexto: Trabalho de 2019 e Modernização 2026
 
-Corretude física não é o objeto do trabalho; desempenho entre formas de implementação é. Isso não é uma limitação a desculpar, é o escopo declarado.
+Este repositório consolida dois marcos: o trabalho de conclusão de curso de 2019, implementação em Numba com GPU NVIDIA, modernizado em 2026 com PyTorch, Triton e suporte a AMD. A simulação de colisão descrita acima — com espectro de massas, velocidades iniciais, detecção e resolução — foi desenvolvida na modernização 2026 como extensão natural do núcleo.
+
+O trabalho de 2019 foi desenvolvido como Trabalho de Conclusão de Curso da Licenciatura em Física da Universidade Federal do Espírito Santo, sob orientação do **Prof. Dr. Roberto Colistete Júnior**. A monografia completa está disponível no [site do curso de Física da UFES em Alegre](https://fisica.alegre.ufes.br/sites/fisica.alegre.ufes.br/files/field/anexo/numba_agregacao_materia_flavio_m_s_hemerli_tcc_lic_fisica_alegre_20190711.pdf) [HEMERLI 2019].
+
+### Nota sobre o escopo de 2019
+
+O trabalho de 2019 tinha escopo declarado: comparação de desempenho entre implementações. Por isso modelava partículas desprovidas de volume, carga ou qualquer propriedade além de massa, e corretude física não era seu objeto. Essa decisão permanece válida para a parte benchmarked do 2019 — e está registrada não como defeito, como escopo:
+
+> A simulação tem como objetivo demonstrar a diferença de tempo de execução entre diferentes métodos de implementação. Para isso modela-se o problema de n-corpos gravitacional com N partículas providas de massa, mas desprovidas de volume, carga ou qualquer outra propriedade física, atraindo-se exclusivamente pela força gravitacional ao longo de um número definido de iterações, e verifica-se a validade da simulação igualando a energia total do sistema à energia potencial gravitacional total do sistema no passo 0. Corretude física não é o objeto do trabalho; desempenho entre formas de implementação é. Isso não é uma limitação a desculpar, é o escopo declarado.
+
+A extensão de 2026, com colisões, muda o objeto: agora há volume (raio de contato), eventos físicos discretos e fenômeno dinâmico a descrever. As partículas deixam de ser abstratas e a física volta a ser central. É por isso que 2026 exigiu documento normativo.
 
 ---
 
@@ -291,20 +341,24 @@ TCCAstro/
 │   ├── config.py               # Constantes e conjuntos de parâmetros
 │   ├── state.py                # Contêiner imutável do estado dinâmico
 │   ├── initial_conditions.py   # Esfera fria e casos de dois corpos
+│   ├── populations.py          # Espectro de massas e velocidades iniciais
 │   ├── observables.py          # Energia e quantidade de movimento
 │   ├── integrators.py          # Os quatro integradores e o laço
+│   ├── collisions.py           # Detecção e resolução de colisões
 │   ├── _pairwise.py            # Auxiliares de tiling
 │   └── backends/               # Os seis backends de cálculo de força
 ├── legacy/notebooks-2019/      # Os quatro notebooks originais, intocados
 ├── tests/                      # Suíte de testes (pytest)
 ├── scripts/
-│   ├── sanity.py                   # Ordem de convergência e colapso
-│   ├── bench.py                    # Benchmark em N fixo
-│   ├── sweep_n.py                  # Varredura de N
-│   ├── integrator_study.py         # Integradores a custo igual
-│   ├── longrun_energy.py           # Energia em horizonte longo
-│   ├── crossover_scaling_law.py    # Lei de escala do cruzamento
-│   └── extract_legacy_results.py   # Extração dos resultados de 2019
+│   ├── sanity.py               # Ordem de convergência e colapso
+│   ├── bench.py                # Benchmark em N fixo
+│   ├── sweep_n.py              # Varredura de N
+│   ├── integrator_study.py     # Integradores a custo igual
+│   ├── longrun_energy.py       # Energia em horizonte longo
+│   ├── crossover_scaling_law.py # Lei de escala do cruzamento
+│   ├── realtime.py             # Visualizador interativo do colapso
+│   ├── capture_collapse_gif.py # Captura de vídeo para GIF
+│   └── extract_legacy_results.py # Extração dos resultados de 2019
 ├── results/
 │   ├── 2019/                  # Dados extraídos dos notebooks originais
 │   └── 2026/                  # Dados da modernização
@@ -313,9 +367,12 @@ TCCAstro/
 │   ├── referencias.md         # Referências bibliográficas ABNT
 │   ├── glossario.md           # Glossário técnico
 │   ├── integradores.md        # Especificação física normativa
+│   ├── simulacao-estocastica.md # Especificação de colisões e populações
 │   └── tcc-2019-extrato.md    # Extrato da monografia original
 └── README.md
 ```
+
+---
 
 ## Como reproduzir
 
@@ -329,6 +386,11 @@ pip install triton
 Executar testes:
 ```bash
 pytest tests/
+```
+
+Ver a simulação com colisões em tempo real:
+```bash
+python scripts/realtime.py --collisions
 ```
 
 Rodar as campanhas:
