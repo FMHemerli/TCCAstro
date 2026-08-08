@@ -2313,6 +2313,14 @@ Sem `NaN`, sem `Inf`, estado finito o tempo todo. **Não é corrupção numéric
 comportado até `t ≈ 1.55 t_ff` com `max m ≈ 7 m_bar` — exatamente o regime que a Seção 4.12 previu —
 e então explosão em `~150` passos, de `7` para `128 m_bar`, seguindo até `321`.
 
+> **Nota acrescentada em 2026-08-08 (d): `1.55 t_ff` aqui NÃO é `t_runaway`, e o número está
+> correto onde está.** Ele marca o **início da fase explosiva** desta execução — a **rodada 1**,
+> defeituosa — no ponto em que `max m ≈ 7 m_bar`, isto é `max m / M_real = 0.007`. `t_runaway` tem
+> outra definição (`INV-31(C7)`: primeiro `t` com `max m / M_real >= 0.10`) e cai bem depois.
+> **Esta nota existe porque o `1.55` foi lido como `t_runaway` e propagado para `(C7)` e para
+> `ENS_RUNAWAY_TFF`** — ver a correção em `(C7)`. O valor permanece intocado: era verdadeiro no seu
+> contexto, e apagá-lo reescreveria a história em vez de registrar o erro de leitura.
+
 **Três vereditos distintos, que não devem ser confundidos:**
 
 1. **A IMPLEMENTAÇÃO está vindicada.** Massa e momento conservam-se exatamente, não há `NaN`, e a
@@ -2435,7 +2443,9 @@ como resultado.** Cinco razões, em ordem de peso:
    preferir remover a acrescentar. Não há o que remover aqui.
 2. **O critério de aceitação declarado pelo usuário está satisfeito.** "Terminar em um corpo só não é
    falha, desde que não aconteça sempre nem muito rápido." Não termina em um corpo: **`774` corpos
-   sobrevivem**. E não é rápido: a transição toma **`1.43 t_ff`, isto é `48%` da execução**, contra
+   sobrevivem**. E não é rápido: a transição toma ~~**`1.43 t_ff`, isto é `48%` da execução**~~
+   [**NÃO CONFIRMADO** — ver 4.13.7; medido no ensemble `0.70`/`0.62`/`0.54 t_ff`, todos acima do
+   piso `> 0.5 t_ff`, o que **preserva esta conclusão**], contra
    `1.2%` na rodada 1. **[M]**
 3. **O que se vê na tela melhorou muito, e é o melhor produto disponível.** Comparação direta:
    - **rodada 1:** transição em `1.2%` do tempo — na tela lê como **glitch**;
@@ -2609,16 +2619,21 @@ observáveis independentes batem **até o último dígito publicado**:
 | **duração da transição** | **`1.43 t_ff` (`48%` da execução)** | **`0.7021 t_ff` (`23%`)** | **NÃO — fator `2`** |
 
 **A trajetória é a mesma; logo a divergência está na DEFINIÇÃO ou na MEDIÇÃO dessas duas grandezas,
-não na física.** **[T]** Duas causas prováveis, e as duas são defeitos deste documento:
+não na física.** **[T]** Duas causas, ambas defeitos deste documento. **A primeira está RESOLVIDA;
+a segunda continua aberta.**
 
-1. **`t_runaway ≈ 1.55` pode ser uma sobrevivência da execução DEFEITUOSA de 4.13.2.** Aquela seção
-   diz: *"crescimento suave e comportado até `t ≈ 1.55 t_ff` com `max m ≈ 7 m_bar`, e então explosão
-   em `~150` passos"*. O `1.55` da constante `ENS_RUNAWAY_TFF` ("medido `~1.55`") pode ter sido
-   transportado da rodada 1 para os parâmetros da revisão (c) sem ser remedido na rodada 3. **Seria a
-   décima oitava sobrevivência do mesmo tipo**, e a suspeita é reforçada pelo fato de o ensemble dar
-   `1.95`–`1.99` nas três sementes limpas, **encostado no teto `2.0` da banda** — que é exatamente o
-   que se espera de uma banda centrada num valor que pertence a outra execução.
-2. **"duração da transição" NUNCA FOI DEFINIDA OPERACIONALMENTE neste documento.** A Seção 4.13.6
+1. **`t_runaway ≈ 1.55` — RESOLVIDO em 2026-08-08 (d). `1.55` nunca foi um `t_runaway`.** Ele vem da
+   Seção 4.13.2, onde descreve o **início da fase explosiva** da **rodada 1** (defeituosa), no ponto
+   em que `max m ≈ 7 m_bar`. Isso é `max m / M_real = 0.007`, **`14x` abaixo do limiar de `0.10`**
+   que define `t_runaway` em `INV-31(C7)`. **[T]** Um instante em que a razão vale `0.007` não pode
+   ser o primeiro em que ela atinge `0.10`. **Não há contradição física: o início do crescimento
+   explosivo (`~1.55`) precede a travessia do limiar (`1.95`), e os dois números são verdadeiros
+   sobre grandezas diferentes.** Houve um número lido como se fosse outro e transportado para `(C7)`
+   e para `ENS_RUNAWAY_TFF`. **Décima oitava sobrevivência do padrão da Seção 9.8**, agravada por vir
+   carimbada **[M]**. `(C7)` está corrigida para `1.9517`; o `1.55` da Seção 4.13.2 permanece
+   intocado, com nota, porque era verdadeiro no seu contexto. **Nenhuma medição nova foi necessária.**
+2. **"duração da transição" NUNCA FOI DEFINIDA OPERACIONALMENTE neste documento — CONTINUA ABERTO.**
+   A Seção 4.13.6
    pede `duracao da transicao > 0.5 t_ff` sem dizer entre quais dois instantes se mede. `t_runaway`
    tem definição (`primeiro t com max_i m_i / M_real >= 0.10`, `INV-31(C7)`); a duração não tem
    nenhuma. **Uma grandeza sem definição operacional dentro de uma predição falsificável é um defeito
@@ -2637,11 +2652,34 @@ na rodada 1. Se a duração correta for `0.70 t_ff`, o número certo é **`23%`*
   passa a `7%` do piso. **Isso é diferença entre "toma metade da execução" e "toma nem um quarto
   dela"**, e a prosa do relatório não pode continuar dizendo `48%` sem que alguém tenha remedido.
 
-**Medição que resolve, e é obrigatória antes de qualquer figura ou prosa sobre a fase colisional:**
-fixar a definição operacional da duração da transição — a proposta natural, coerente com `(C7)`, é
-`t(max m/M_real = 0.60 * valor final) - t(max m/M_real = 0.10)` sobre a grade **por passo** — e
-recomputar `t_runaway` e a duração para `20190225` com as definições escritas. Até lá, **`1.55` e
-`48%` estão marcados como NÃO CONFIRMADOS** e não podem ser citados.
+**Nota de 2026-08-08 (d): o `1.43 t_ff` também é explicável, e isso reforça o diagnóstico.**
+`3.0 - 1.55 = 1.45 t_ff`, praticamente o `1.43` publicado: o número é consistente com "do **início da
+fase explosiva** até o fim da execução". O `0.7021` do ensemble mede um intervalo mais estreito.
+**Nenhum dos dois é errado; os dois medem coisas diferentes, porque não há definição.** É a mesma
+raiz do item 1 — um instante de referência tomado no início do crescimento em vez de na travessia do
+limiar. **[A]**
+
+**O que fica pendente, e é definição antes de medição:** fixar operacionalmente a duração da
+transição. A proposta natural, coerente com `(C7)`, é
+`t(max m/M_real = 0.60 * valor final) - t_runaway`, sobre a grade **por passo**; recomputar depois
+para `20190225`. **Isto NÃO é decidido aqui** — fixar a definição é mudar uma linha de uma predição
+falsificável, e este documento não o faz de passagem.
+
+> # MARCAÇÃO NORMATIVA — `1.43 t_ff` e `48%` estão NÃO CONFIRMADOS
+>
+> **A partir de 2026-08-08 (d), os valores `1.43 t_ff` e `48% da execução` para a duração da
+> transição são NÃO CONFIRMADOS e NÃO PODEM SER CITADOS** no relatório, em figura, ou em prosa,
+> enquanto a definição operacional não for fixada e a grandeza remedida. Onde aparecem no documento,
+> aparecem com esta marcação.
+>
+> **O que PODE ser afirmado no lugar deles, e é suficiente para o argumento que eles serviam:** a
+> duração da transição medida no ensemble é `0.7021`, `0.6188` e `0.5355 t_ff` **[M]**, as três
+> **acima** do piso `> 0.5 t_ff` da predição vigente. **A conclusão que dependia do número — a
+> transição é um processo, não um degrau — permanece verdadeira e medida.** O que não se pode
+> continuar dizendo é `48%`.
+>
+> **`t_runaway`, esse, está CONFIRMADO e resolvido:** `1.9517 t_ff` **[M]**, ver o item 1 acima.
+> A marcação de não confirmado **não** se aplica a ele.
 
 ##### O que o ensemble testa, e o que ele NÃO testa
 
@@ -3240,10 +3278,22 @@ execução com fusão reprova código correto.
 >
 > **Enunciados `(b)` e `(a)` também ganharam regime de validade declarado**, pela mesma razão: as
 > duas cotas foram derivadas de medições do estágio 2 (pares de massa igual, sem corpo dominante) e
-> a execução aceita da Seção 4.13.4 sai desse regime a partir de `t_runaway ≈ 1.55 t_ff`. Isso é
-> **escopo**, não afrouxamento: a cota continua valendo, sem alteração de valor, onde a sua
+> a execução aceita da Seção 4.13.4 sai desse regime a partir de `t_runaway = 1.9517 t_ff` **[M]**.
+> Isso é **escopo**, não afrouxamento: a cota continua valendo, sem alteração de valor, onde a sua
 > derivação vale. O escopo é o que a própria Seção 4.13.5 já exigia declarar em toda figura e todo
 > texto sobre a fase colisional.
+>
+> > **Correção de 2026-08-08 (d), conferida e não substituída mecanicamente.** Esta cláusula dizia
+> > `t_runaway ≈ 1.55 t_ff`, valor corrigido para `1.9517` em `(C7)`. **O escopo declarado NÃO muda
+> > de forma**, porque ele está ancorado ao **limiar** (`max_i m_i / M_real < 0.10`), não ao
+> > instante: o tempo aqui é ilustrativo, o critério é a razão de massa. **E a correção move o
+> > escopo na direção segura** — o instante de saída do regime é `1.95`, não `1.55`, logo as duas
+> > cotas valem sobre **mais** da execução (`65%` em vez de `52%`), não menos. **Nenhuma cota foi
+> > afrouxada e nenhum resultado passa a ser coberto que antes não fosse.**
+> >
+> > **Ressalva que já constava da Seção 7 e continua valendo:** o resíduo por evento cresce
+> > **continuamente** com `m_i m_j`, de modo que `0.10` é uma **convenção de corte**, não uma borda
+> > física — a cota degrada antes dela. Isso não é reaberto aqui.
 
 **Enunciado (b), ao longo da execução — VÁLIDO SÓ ANTES DE `t_runaway`.** Enquanto
 `max_i m_i / M_real < 0.10`, `|ΔE_total/E_total(0)|` obedece aos critérios **qualitativos** de
@@ -3484,7 +3534,31 @@ vigente ao fim desta lista.** Enunciado original, preservado como história: `N_
 > **A regra que esta cláusula sempre teve — *"se o runaway ocorrer, ele é o resultado e deve ser
 > relatado como tal; o que não é permitido é que ocorra sem ser detectado"* — está sendo HONRADA em
 > 2026-08-08, e não contornada.** Ele ocorreu, foi detectado, e está medido:
-> `max_i m_i / M_real = 0.3213`, `t_runaway ≈ 1.55 t_ff`. **[M]**
+> `max_i m_i / M_real = 0.3213`, **`t_runaway = 1.9517 t_ff`** **[M]** (semente `20190225`, Seção
+> 4.13.7).
+>
+> > # CORREÇÃO 2026-08-08 (d) — esta cláusula publicava `t_runaway ≈ 1.55 t_ff` como **[M]**, e
+> > `1.55` NUNCA FOI UM `t_runaway`.
+> >
+> > **A própria definição desta cláusula decide o caso, sem medição nova.** `t_runaway` é o primeiro
+> > `t` com `max_i m_i / M_real >= 0.10`. O `1.55` vem da Seção 4.13.2, onde descreve outra coisa e
+> > outra execução: *"crescimento suave e comportado até `t ≈ 1.55 t_ff` com `max m ≈ 7 m_bar`"* — é
+> > o **início da fase explosiva**, na **rodada 1** (a defeituosa). E `7 m_bar` de `1000 m_bar` é
+> > `max m / M_real = 0.007`, **`14x` ABAIXO do limiar de `0.10` desta cláusula**. **[T]** Um
+> > instante em que a razão vale `0.007` não pode ser o primeiro instante em que ela atinge `0.10`.
+> >
+> > **Os dois números medem coisas diferentes, e ambos são verdadeiros no seu contexto:** o início do
+> > crescimento explosivo (`~1.55`, e `~1.5` também na rodada 3) **precede** a travessia do limiar de
+> > `10%` (`1.95`). Não há contradição física; houve **um número lido como se fosse outro** e
+> > transportado da rodada 1 para os parâmetros da revisão (c) e para esta cláusula. É a **décima
+> > oitava sobrevivência** do padrão catalogado na Seção 9.8 — com o agravante de que aqui ela vinha
+> > carimbada **[M]**.
+> >
+> > **Consequência sobre a banda de `ENS_RUNAWAY_TFF = (1.2, 2.0)`:** ela foi desenhada em torno de
+> > `1.55`, isto é, em torno de um valor que **pertence a outra grandeza**. Por isso as três sementes
+> > limpas medem `1.95`–`1.99`, encostadas no teto. **A banda não é reaberta aqui** — ela passou, e
+> > reabri-la depois de ver o resultado é precisamente o que este documento proíbe. Fica **registrado**
+> > que a sua origem é defeituosa e que a margem é de `0.6%` a `2.4%`.
 >
 > A predição de campo médio que esta cláusula mandava confrontar (`~0.005`, `20x` abaixo do limiar)
 > está **refutada por fator `64`**, e a Seção 4.12 registra por quê. **(C7) deixa de ser um critério
@@ -3676,12 +3750,24 @@ ENS_MAX_MASS_CV        = 0.04            # [M] dispersao entre sementes de COLIS
                                          #     pequena; sugere que o valor final e' fixado pela
                                          #     realizacao de POSICOES, que ficou fixa.  Ver 4.13.7.
 #
-# NAO CONFIRMADOS -- divergem do que 4.13.4 registra para a MESMA execucao (Sec. 4.13.7):
-#   t_runaway ~1.55  contra  1.9517 medido no ensemble  (26% de diferenca)
-#   duracao 1.43 t_ff (48%)  contra  0.7021 t_ff (23%)  (fator 2)
-#   A trajetoria e' a mesma (N_final, max m e E_int batem ate' o ultimo digito), logo a
-#   divergencia esta' na DEFINICAO/MEDICAO.  "duracao da transicao" nunca foi definida
-#   operacionalmente neste documento.  NAO CITAR 1.55 nem 48% ate' remedir.
+# t_runaway: RESOLVIDO em 2026-08-08 (d).  O valor correto sob a definicao de INV-31(C7)
+#   (primeiro t com max m/M_real >= 0.10) e' 1.9517 t_ff [M].  O antigo "~1.55" NUNCA foi um
+#   t_runaway: vem da Sec. 4.13.2 (rodada 1, DEFEITUOSA) e marca o inicio da fase explosiva,
+#   com max m ~ 7 m_bar, isto e' max m/M_real = 0.007 -- 14x ABAIXO do limiar de 0.10.  [T]
+#   Foi lido como t_runaway e transportado para (C7) e para a banda abaixo.  Nenhuma medicao
+#   nova foi necessaria; a propria definicao decide.
+ENS_RUNAWAY_TFF_MEASURED = (1.9517, 1.9874, 1.9636)  # [M] tres sementes limpas, Sec. 4.13.7
+# NOTA: ENS_RUNAWAY_TFF = (1.2, 2.0) foi desenhada em torno de 1.55, que pertence a outra
+#   grandeza.  A banda PASSOU (margens de 0.6% a 2.4% do teto) e NAO e' reaberta -- reabrir
+#   depois de ver o resultado e' o ajuste post-hoc que este documento proibe.  Origem
+#   defeituosa REGISTRADA.
+#
+# NAO CONFIRMADO -- duracao da transicao.  1.43 t_ff (48%) contra 0.7021 t_ff (23%) medido,
+#   para a MESMA execucao (N_final, max m e E_int batem ate' o ultimo digito).  Causa: a
+#   grandeza NUNCA foi definida operacionalmente neste documento.  1.43 ~ 3.0 - 1.55, isto e',
+#   medida desde o inicio da fase explosiva; 0.7021 mede intervalo mais estreito.  Os dois
+#   medem coisas diferentes.  PROIBIDO CITAR 1.43 ou 48% ate' a definicao ser fixada.
+#   Pode-se citar: 0.7021 / 0.6188 / 0.5355 t_ff [M], as tres acima do piso > 0.5 t_ff.
 #
 # NAO REPORTADO pela campanha, e INV-31(C6) exige: min_i m_i / m_bar >= 1e-3 em >= 3 de 4.
 
@@ -3992,7 +4078,7 @@ sumidouro de massa e, portanto, não tem teto de massa, para nenhum valor de nen
 | critério | leitura |
 |---|---|
 | existe correção simples? | **não** — a causa é estrutural; conter exigiria fragmentação `2 -> muitos` ou supressão por massa, **ambas acrescentam complexidade** |
-| o usuário aceita? | **sim** — "terminar em um corpo só não é falha, desde que não seja sempre nem rápido demais": `774` corpos sobrevivem, e a transição toma `48%` da execução |
+| o usuário aceita? | **sim** — "terminar em um corpo só não é falha, desde que não seja sempre nem rápido demais": `774` corpos sobrevivem, e a transição toma ~~`48%`~~ [**NÃO CONFIRMADO**, 4.13.7] `0.70 t_ff` medido, acima do piso `> 0.5 t_ff` — a conclusão não muda |
 | o que se vê na tela? | **melhor do que a alternativa** — na rodada 1 a transição tomava `1.2%` do tempo e lia como *glitch*; agora toma metade da execução e lê como **processo**: um objeto crescendo e comendo o núcleo, que é um *runaway merger* reconhecível |
 | o alvo era do modelo ou da análise? | **da análise** — `max m ~ 3 m_bar` nunca foi propriedade deste modelo; era propriedade de uma aproximação de campo médio que falhou **três vezes** |
 | o documento já tinha regra? | **sim, e ela mandava aceitar** — `INV-31(C7)`: *"se o runaway ocorrer, ele é o resultado e deve ser relatado como tal"* |
@@ -4055,6 +4141,7 @@ uma decisão é trabalho de varredura, não de parágrafo.**
 | 9 | Sec. 1 | "as **nove** coisas do PISO" | oito desde a revisão (b) |
 | 10 | Sec. 1 | "este documento **é escrito** antes de a implementação existir" | nota de estado |
 | 11 | Sec. 1.3 | estágio 3 "próximo" | executado duas vezes; **ensemble executado, ver 4.13.7** |
+| **18** | `INV-31(C7)`, Sec. 6, Sec. 8 | `t_runaway ≈ 1.55 t_ff` **[M]** — número da rodada 1 defeituosa, medindo o **início da fase explosiva** (`max m/M_real = 0.007`), lido como `t_runaway` (limiar `0.10`) | corrigido para `1.9517` **[M]**; decidido pela própria definição de `(C7)`, sem medição nova |
 | 12 | Sec. 4.12 | cálculo de teto retratado, redigido no presente | marcado `[HISTÓRICO]`; incoerência `3.53` × `3.17` registrada, não reconciliada |
 | 13 | `INV-31` | **duas** cláusulas `(C8)`, com bandas diferentes | uma, a de 4.13.6 |
 | 14 | Sec. 10, item 19 | "não há crescimento descontrolado, e há teto fechado" | retratado |
@@ -4309,7 +4396,8 @@ forma correta está enunciada e marcada **[A]**, com a medição que a decide no
     do critério por argumento, não o seu **valor** para caber o número — e é essa distinção que
     separa a decisão de um ajuste de resultado.
 46. **A decisão de parar tem justificativa de PRODUTO, e é ela que decide.** Na rodada 1 a transição
-    tomava `1.2%` da execução e lia como *glitch*; agora toma `48%` e lê como **processo** — um
+    tomava `1.2%` da execução e lia como *glitch*; agora toma ~~`48%`~~ [**NÃO CONFIRMADO**, 4.13.7;
+    medido `0.70 t_ff`, isto é `23%`, acima do piso `> 0.5 t_ff`] e lê como **processo** — um
     objeto crescendo e comendo o núcleo ao longo de metade da simulação, que é um *runaway merger*
     reconhecível. `774` corpos sobrevivem. O critério declarado pelo usuário ("não sempre, não rápido
     demais") está satisfeito, e a alternativa contida — uma população quase uniforme de corpos entre
@@ -4326,9 +4414,13 @@ forma correta está enunciada e marcada **[A]**, com a medição que a decide no
     duração `> 0.5 t_ff`, `|E_int|/|E_0| ∈ [3,40]`, canais cada `>= 5%`. **A decisão de aceitar o
     runaway deixa de repousar sobre uma execução.** Três ressalvas, todas em 4.13.7 e nenhuma
     decorativa: o ensemble varia **só a semente de colisão** e não testa robustez entre
-    **realizações**; `t_runaway` passa colado no teto da banda, e os valores `~1.55` e `48%` que
-    este documento publica para a mesma execução **divergem** do ensemble e estão **não
-    confirmados**; e uma das quatro execuções terminou com `|p| = nan`, não reproduziu, e está
+    **realizações**; `t_runaway` passa colado no teto da banda, porque a banda foi desenhada em
+    torno de `1.55`, valor que **nunca foi um `t_runaway`** — era o início da fase explosiva da
+    rodada 1, a `max m/M_real = 0.007`, `14x` abaixo do limiar de `(C7)` — **corrigido para
+    `1.9517`** **[M]**; a duração da transição segue **NÃO CONFIRMADA** (`1.43 t_ff`/`48%` contra
+    `0.70 t_ff` medido) porque a grandeza nunca foi definida operacionalmente, sem que isso mude a
+    conclusão, já que as três sementes ficam acima do piso `> 0.5 t_ff`; e uma das quatro execuções
+    terminou com `|p| = nan`, não reproduziu, e está
     excluída por regra pré-declarada — **era justamente a que teria falsificado a predição**, o que
     obriga a exclusão a ser lida com a justificativa completa, não aceita de passagem.
 

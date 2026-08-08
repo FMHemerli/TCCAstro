@@ -33,7 +33,7 @@ O que essas quatro execuções testam é a robustez às escolhas estocásticas d
 
 ## Como o Trabalho foi Feito
 
-**Documento normativo escrito antes do código.** Antes de qualquer implementação, a Seção 4 de `docs/simulacao-estocastica.md` fixou a física: definições de colisão, regime de desfecho, algoritmo de detecção varrida, conservação exigida. Cada constante, cada tolerância, cada critério de aceitação necessários aos testes estão no documento. Todo erro nele seria encontrado pelos testes.
+**Documento normativo escrito antes do código.** Antes de qualquer implementação, a Seção 4 de `docs/simulacao-estocastica.md` fixou a física: definições de colisão, regime de desfecho, algoritmo de detecção varrida, conservação exigida. Cada constante, cada tolerância, cada critério de aceitação necessários aos testes estão no documento.
 
 **Testes escritos sem ler a implementação.** A suite de testes foi redigida por agente que leu o documento normativo mas não leu o código de `src/nbody/collisions.py`. O resultado: 308 testes, 308 passando. As divergências iniciais foram todas de construção dos próprios testes, não de bugs de código. Além disso, a suite independente descobriu uma inconsistência interna do documento: uma seção exibia um invariante que outra seção já havia revogado.
 
