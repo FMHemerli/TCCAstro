@@ -142,6 +142,7 @@ def integrate(
     callback=None,
     callback_every: int | None = None,
     collision: "collisions.CollisionModel | None" = None,
+    collision_rng: np.random.Generator | None = None,
 ) -> "State | tuple[State, CollisionRunStats]":
     if integrator not in INTEGRATOR_NAMES:
         raise ValueError(f"unknown integrator {integrator!r}; valid names are {INTEGRATOR_NAMES}")
@@ -158,6 +159,8 @@ def integrate(
                 "integrate(): collision resolution is only defined inside the "
                 f"velocity_verlet drift (Sec. 4.5, Sec. 9.1.1), got integrator={integrator!r}"
             )
+    elif collision_rng is not None:
+        raise ValueError("integrate(): collision_rng was given but collision is None")
 
     backend_obj = _resolve_backend(backend)
 
@@ -170,7 +173,19 @@ def integrate(
     if integrator == "velocity_verlet":
         a_current = backend_obj.accelerations(current.r, current.m, softening)
 
-    rng_c = np.random.default_rng(collision.seed) if collision is not None else None
+    # The collision stream must survive across separate integrate() calls (Sec. 4.7.1,
+    # INV-32: exactly 2 draws per accepted event, continuous over the run). A caller that
+    # advances a simulation in chunks (e.g. the real-time viewer, one call per frame) has to
+    # own the generator itself and pass the same object back in on every call; a fresh
+    # np.random.default_rng(collision.seed) built here on every call would restart the stream
+    # at every chunk boundary instead of continuing it. collision_rng is that caller-owned
+    # object. When omitted, a generator seeded from collision.seed is created here, which
+    # reproduces the previous single-call behaviour bit for bit for any caller that still
+    # makes one integrate() call per run.
+    if collision is not None:
+        rng_c = collision_rng if collision_rng is not None else np.random.default_rng(collision.seed)
+    else:
+        rng_c = None
     stats = CollisionRunStats() if collision is not None else None
 
     if every is not None:

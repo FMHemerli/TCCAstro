@@ -13,24 +13,39 @@ step. No force law, integrator or sampling distribution is reimplemented here --
 Coupling between simulation and frames: a fixed simulation timestep dt (a fixed fraction of the
 analytic free-fall time t_ff), a fixed number of simulation steps advanced per rendered frame
 (STEPS_PER_FRAME), and a capped frame rate (TARGET_FPS). The picture on screen is the real
-trajectory sampled every STEPS_PER_FRAME steps, not an interpolation.
+trajectory sampled every STEPS_PER_FRAME steps, not an interpolation. The coupling RULE (fixed
+dt, a fixed step count per frame) is the same in both modes; dt is not -- DT_OVER_TFF without
+--collisions, DT_OVER_TFF_COLLISION (roughly 8.4x finer) with it -- but the step count is the
+same order in both, STEPS_PER_FRAME and STEPS_PER_FRAME_COLLISION (see that constant's docstring:
+the collision RNG stream integrate() advances is now continuous across calls, so this no longer
+needs to be coarser than the collisionless value to keep the trajectory correct). The on-screen
+dt / t_ff / steps-per-frame readout always states which is active.
 
 The cap exists so the collapse can be watched. Simulated time advances at
-TARGET_FPS * STEPS_PER_FRAME * DT_OVER_TFF t_ff per wall-clock second; uncapped, this machine
-runs the whole collapse and first centre crossing in well under a second. The cap changes only
-the pacing, never dt or the trajectory. The achieved rate is shown live as "fps".
+TARGET_FPS * STEPS_PER_FRAME * DT_OVER_TFF t_ff per wall-clock second without --collisions;
+uncapped, this machine runs the whole collisionless collapse and first centre crossing in well
+under a second. With --collisions, achieved fps replaces TARGET_FPS in that product, and dt is
+finer, so simulated time advances more slowly per wall-clock second even at the same fps -- the
+measured fps is reported live and in the final report, not assumed. The cap changes only the
+pacing, never dt or the trajectory. The achieved rate is shown live as "fps".
 
 State (positions, velocities, masses) lives on the GPU between steps. The only thing that crosses
-to the host each frame is the (N, 3) position array needed to draw the markers; velocities, masses
-and the integrator's internal acceleration buffer never leave the device.
+to the host each frame is the (N, 3) position array needed to draw the markers -- plus, only with
+--collisions on, since only then can masses or slot occupancy change frame to frame, the (N,) mass
+array, needed to filter dead slots and size/color the markers by mass. Velocities and the
+integrator's internal acceleration buffer never leave the device, in either mode.
 
 Integrator: velocity_verlet only, fixed for the whole run. It is symplectic, so its energy error
 oscillates in a bounded band instead of drifting away secularly -- the right property for a panel
 meant to run indefinitely.
 
-Precision: float32, fixed. On this project's GPU backends float32 is measured at roughly 20x the
-throughput of float64, and the resulting round-off is far below the 5% band that matters physically
-here (see docs/integradores.md for the measurement this decision is based on).
+Precision: float32 without --collisions, fixed for that path exactly as before this flag existed.
+On this project's GPU backends float32 is measured at roughly 20x the throughput of float64, and
+the resulting round-off is far below the 5% band that matters physically here (see
+docs/integradores.md for the measurement this decision is based on). With --collisions, float64
+instead (COLLISION_DTYPE): docs/simulacao-estocastica.md validates every collision energy-
+conservation invariant in fp64, and a probe run measured the difference is not academic at this
+precision -- see COLLISION_DTYPE's docstring for the numbers.
 
 GPU: required. If no CUDA/ROCm GPU is available this script raises GPUUnavailable and does not
 fall back to the CPU backends -- CPU-speed dynamics would misrepresent what a real-time viewer is
@@ -53,15 +68,52 @@ scales as (m_i / mean(m))^(1/3), clamped to a visible range, and marker color ra
 default blue at the mean mass towards gold at the heaviest body realized, so the 1-3 Salpeter-tail
 bodies are visually distinguishable from the rest -- the whole point of turning the spectrum on.
 
-Auto-stop (two criteria, checked every frame): |dE/E0| > 1 (accumulated energy error equals the
-total energy -- the trajectory no longer means anything), or no particle left inside the viewed
-volume (the collapse has ejected/dispersed everything worth looking at). Either one freezes the
-simulation (stops advancing state) but leaves the window, camera and HUD live, with an on-screen
-message naming which criterion fired and at what simulated time.
+Auto-stop, checked every frame: no particle left inside the viewed volume (the collapse has
+ejected/dispersed everything worth looking at) always freezes the simulation (stops advancing
+state, leaves the window/camera/HUD live, on-screen message naming what fired and when). Without
+--collisions, |dE/E0| > 1 (accumulated mechanical energy error equals the total energy -- the
+trajectory no longer means anything) freezes it too, exactly as before this flag existed. WITH
+--collisions, that energy trigger does not apply: docs/simulacao-estocastica.md Sec. 4.10/4.13.6
+retired the bound on the collisional ledger after three tightened formulations all failed against
+correct, physically-accepted runs -- the documented runaway-merger phenomenon itself drives
+max |E_int|/|E0| into [3, 40] (measured 7.8-10.8 across four seeds) by design, so a threshold on
+the energy readout would be measuring the phenomenon the viewer exists to show, not a broken
+trajectory. |dE_total/E0| and E_int/|E0| are REPORTED with --collisions, not policed by any
+threshold here -- the HUD and energy panel say so explicitly, so a large number reads as the
+documented signature it is, not as a defect.
+
+Collisions (--collisions, off by default): wires src/nbody/collisions.py's already-validated
+detection, pairing and three-outcome resolution (elastic, merger, fragmentation) into the same
+integrate() call used for the collisionless path -- integrator="velocity_verlet",
+collision=CollisionModel(...) -- so this script never reimplements any of that physics. The
+contact radius R_i = chi * SOFTENING * (m_i / m_bar)^(1/3) is set by --chi (dimensionless,
+default config.CHI_DEFAULT), read once at startup; m_bar is the run's target mean mass (--mass)
+and v_coh is collisions.v_coh_from_state(state, radius), both computed once and held fixed for
+the run. Off by default, so --cold and the plain random_sphere path are unaffected and stay
+bit-for-bit identical to before this flag existed. Turning it on also switches precision to
+float64 and dt to the finer DT_OVER_TFF_COLLISION (both described above) -- neither is a free
+choice; both are what the source physics document's own validated collision campaign used.
+
+With --collisions, four things change on screen, all only in that mode: (1) the HUD gains a
+live particle count and running elastic/merger/fragmentation event counts; (2) marker size and
+color are recomputed every frame instead of once at construction, because masses change under
+merges and fragmentations, and dead slots (m == 0, left behind by a merger, carrying the
+surviving body's own position -- nbody.observables.n_live's definition of "live" is m > 0) are
+dropped before drawing so they cannot render as phantom markers on top of the body that absorbed
+them; size normalizes against the CURRENT frame's live mass range rather than the fixed range
+MARKER_SIZE_MIN/MAX was calibrated for (see _mass_visuals_live), so a body growing past the
+initial ~500x mass ratio stays visibly the largest thing on screen instead of saturating the
+cap or shrinking everything else to invisibility; (3) the energy panel plots E_int/|E0| and
+|dE_total/E0| with E_total = K + U + E_int (E_int is the cumulative collisional dissipation
+ledger, Sec. 4.10) instead of the collisionless |dE/E0| -- same panel, new label, so the two
+quantities are never mistaken for one another on screen; (4) both are labelled REPORTED, not
+watched -- see the Auto-stop paragraph above for why judging the trajectory by them is wrong in
+this mode.
 
 Usage:
     python scripts/realtime.py [--n N] [--mass MASS] [--radius RADIUS] [--cold]
         [--alpha ALPHA] [--mass-ratio RATIO] [--virial-q Q] [--f-cut F_CUT] [--seed SEED]
+        [--collisions] [--chi CHI]
 
 Defaults for every option match nbody.config. No upper-bound validation is applied to --n, --mass
 or --radius by design: if a value is large enough to be slow or to exhaust GPU memory, it is
@@ -85,7 +137,7 @@ from vispy import app, scene
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
-from nbody import config  # noqa: E402
+from nbody import collisions, config  # noqa: E402
 from nbody.backends import get_backend  # noqa: E402
 from nbody.backends.base import BackendUnavailable  # noqa: E402
 from nbody.initial_conditions import cold_sphere, random_sphere  # noqa: E402
@@ -93,17 +145,76 @@ from nbody.integrators import integrate  # noqa: E402
 from nbody.observables import total_energy  # noqa: E402
 
 DTYPE = torch.float32
+# Collision resolution runs in float64, not the collisionless DTYPE above. docs/simulacao-
+# estocastica.md validates every collision energy-conservation invariant (INV-23's per-event and
+# per-run residual bounds, TOL-EVENT-CONS, TOL-EINT-DRIFT) in fp64, not fp32, and a controlled
+# probe (N=1000, chi=CHI_DEFAULT, --cold, both precisions run with identical 40-step-per-call
+# chunking so the comparison isolates precision alone) measured float64 keeping |dE_total/E0| =
+# 1.99e-2 at t = 2.0 t_ff against float32's 1.46e-1 at the same t -- roughly 7x smaller, and the
+# gap was still widening at that point. This is a real, measured margin, not a nominal one.
+# float32 stays the default (DTYPE above) for the collisionless path, where it is the validated,
+# measured-adequate choice (see the Precision paragraph in the module docstring); this is a
+# --collisions-only override, decided here because it is a simulation/precision coupling choice,
+# not a change to collisions.py's physics.
+COLLISION_DTYPE = torch.float64
 STEPS_PER_FRAME = 4  # fixed simulation steps advanced per rendered frame
+# --collisions advances the same number of steps per frame as the collisionless path. This was
+# not always safe to do: integrate() used to reseed the collision RNG stream from collision.seed
+# on every call, so calling it once per rendered frame with a small n_steps restarted that stream
+# every frame instead of drawing one continuous sequence over the run -- measurably so (a probe at
+# the time showed a ~20x difference in |dE_total/E0| between 4-step and 40-step chunking of the
+# same span). integrate() now accepts a caller-owned collision_rng: np.random.Generator, advanced
+# in place, so the stream is continuous across calls regardless of chunk size (fixed in
+# src/nbody/integrators.py, confirmed there with a controlled probe across 1/4/40/600-step
+# chunking, all bit-for-bit identical). This script owns that generator: self.collision_rng is
+# created once, in Viewer.__init__ alongside self.collision_model, and the SAME object is passed
+# to integrate() on every on_timer call for the run's whole duration -- creating a new generator
+# per call, or per frame, would silently reintroduce the restart-every-call behaviour this
+# depends on not having. STEPS_PER_FRAME_COLLISION is kept as its own name rather than reusing
+# STEPS_PER_FRAME because dt still differs by mode (DT_OVER_TFF_COLLISION below), not because the
+# step count needs to. With the continuous stream, chunk size no longer changes the trajectory
+# (that was exactly what the fix's own controlled probe measured), so this is set comparably to
+# the collisionless STEPS_PER_FRAME rather than the larger, now-unnecessary value chunking used to
+# require -- see the final report for the fps measured at this value.
+STEPS_PER_FRAME_COLLISION = 4
 DT_OVER_TFF = 1.0 / 2000.0  # fixed simulation timestep, as a fraction of t_ff (matches sanity.py check 3)
 # Frame rate is capped so the collapse is watchable. Uncapped, the loop runs at 600-880 fps
 # (measured, N=1000), which advances 1.2-1.8 t_ff per wall-clock second: the whole collapse and
 # first centre crossing would be over in under a second. Capping also stops the viewer rendering
 # far faster than any display can show. At this cap the run advances
 # TARGET_FPS * STEPS_PER_FRAME * DT_OVER_TFF = 0.12 t_ff per second, so the collapse takes ~8 s.
+#
+# --collisions uses a different, finer dt (DT_OVER_TFF_COLLISION below), not DT_OVER_TFF: the
+# stage-3 collision-resolution campaign that produced the documented runaway-merger phenomenon
+# (docs/simulacao-estocastica.md Sec. 4.13) was run at config.DT_COLLISION, roughly 8.4x finer
+# than DT_OVER_TFF's t_ff/2000 -- coarser than that is not a validated regime for resolve(). The
+# ratio is expressed as a fraction of a nominal t_ff (the default config's equal-mass, default-N
+# free-fall time) rather than hardcoded as an absolute dt, so it generalizes to --n/--mass/--radius
+# the same self-consistent way DT_OVER_TFF already does: self.dt = self.t_ff * (this ratio).
+_NOMINAL_TOTAL_MASS = config.N_PARTICLES * config.PARTICLE_MASS
+_NOMINAL_VOLUME = (4.0 / 3.0) * math.pi * config.SPHERE_RADIUS**3
+_NOMINAL_DENSITY = _NOMINAL_TOTAL_MASS / _NOMINAL_VOLUME
+_NOMINAL_T_FF = math.sqrt(3.0 * math.pi / (32.0 * config.G * _NOMINAL_DENSITY))
+DT_OVER_TFF_COLLISION = config.DT_COLLISION / _NOMINAL_T_FF
 TARGET_FPS = 60.0
 VIEW_RADIUS_FACTOR = 4.0  # "viewed volume" and initial camera framing, as a multiple of sphere_radius
 ENERGY_ERROR_LIMIT = 1.0  # |dE/E0| beyond this: the trajectory is no longer physical
-HUD_N_LINES = 6  # fixed HUD line count (5 status lines + 1 freeze-message slot, blank when running)
+# ENERGY_ERROR_LIMIT gates the auto-stop ONLY without --collisions. With --collisions it is not
+# applied to |dE_total/E0| at all (docs/simulacao-estocastica.md Sec. 4.10/4.13.6: the bound on
+# the collisional energy ledger was retired after three formulations all failed against correct,
+# physically-accepted runs -- the documented runaway-merger phenomenon drives max |E_int|/|E0|
+# into [3, 40] by design, measured 7.8-10.8 across four seeds, so a threshold here would flag the
+# phenomenon itself, not a broken trajectory). Raising ENERGY_ERROR_LIMIT to a value the
+# documented physics cannot reach would just be choosing a number to fit a measurement, which is
+# exactly what that retraction forbids; removing the check in that mode is the honest option.
+# Fixed HUD line count, sized for the larger of the two modes. Without --collisions this script
+# still writes exactly the original 6-line layout (5 status lines + 1 freeze-message slot); with
+# --collisions it writes 8 (the same 4 shared status lines, 3 collision lines -- live count and
+# event counts, then E_int/|E0| and |dE_total/E0| -- and 1 freeze-message slot). A vispy Text
+# with fewer text entries than positions simply ignores the extra positions (see
+# vispy.visuals.text.text.TextVisual._prepare_draw), so the shorter, unchanged 6-line list keeps
+# rendering at exactly its original 6 screen positions regardless of this constant.
+HUD_N_LINES = 8
 
 # Marker encoding of mass (--cold bypasses all of this and reuses the literal pre-spectrum values
 # below directly, so its picture is bit-for-bit identical to before random_sphere was wired in).
@@ -164,7 +275,25 @@ def parse_args():
         help="use the cold spherical collapse initial condition (equal masses, zero velocity, "
         "cold_sphere) instead of the default random_sphere; reproduces the reference run exactly",
     )
+    parser.add_argument(
+        "--collisions", action="store_true",
+        help="enable collision resolution (elastic / merger / fragmentation, "
+        "src/nbody/collisions.py) inside the velocity_verlet drift; OFF by default so --cold "
+        "and the plain random_sphere path stay bit-for-bit identical to before this flag existed. "
+        "Also switches precision to float64 and dt to a finer fraction of t_ff (both required for "
+        "stability at the validated chi=CHI_DEFAULT, see COLLISION_DTYPE and "
+        "DT_OVER_TFF_COLLISION), so a run advances noticeably slower in simulated time per "
+        "wall-clock second than the collisionless default",
+    )
+    parser.add_argument(
+        "--chi", type=float, default=config.CHI_DEFAULT,
+        help="dimensionless contact-radius parameter, chi = R_ref / SOFTENING "
+        "(R_i = chi * SOFTENING * (m_i / m_bar)^(1/3)); ignored unless --collisions is set",
+    )
     args = parser.parse_args()
+
+    if args.collisions and args.chi <= 0.0:
+        parser.error(f"--chi must be positive, got {args.chi}")
 
     if not args.cold and args.virial_q != 0.0:
         q_max = config.Q_USABLE_COEFF * args.f_cut**2
@@ -227,10 +356,18 @@ class Viewer:
         # whatever --virial-q was left at its default.
         self.virial_q = 0.0 if self.cold else args.virial_q
 
+        # --collisions and --chi are read here, before the state is built, because they decide
+        # the working dtype (COLLISION_DTYPE vs DTYPE, see that constant's docstring) that
+        # cold_sphere/random_sphere are constructed with below -- not just the eventual
+        # CollisionModel, which is built further down once self.state exists.
+        self.collisions_enabled = args.collisions
+        self.chi = args.chi
+        self.dtype = COLLISION_DTYPE if self.collisions_enabled else DTYPE
+
         if self.cold:
             self.state = cold_sphere(
                 n=self.n, radius=self.radius, particle_mass=self.mass,
-                seed=self.seed, dtype=DTYPE, device=self.device,
+                seed=self.seed, dtype=self.dtype, device=self.device,
             )
         else:
             self.state = random_sphere(
@@ -239,7 +376,7 @@ class Viewer:
                     "alpha": self.alpha, "ratio": self.mass_ratio, "particle_mass": self.mass,
                 },
                 virial_ratio=self.virial_q, f_cut=self.f_cut,
-                dtype=DTYPE, device=self.device,
+                dtype=self.dtype, device=self.device,
             )
         print(f"compiling GPU kernel for N={self.n} (torch.compile) ...", file=sys.stderr)
         # torch_compiled's one-time compile cost is measured (results/2026/sweep_n.csv) to grow
@@ -260,13 +397,47 @@ class Viewer:
         volume = (4.0 / 3.0) * math.pi * self.radius**3
         density = self.total_mass / volume
         self.t_ff = math.sqrt(3.0 * math.pi / (32.0 * config.G * density))
-        self.dt = self.t_ff * DT_OVER_TFF
+        self.dt = self.t_ff * (DT_OVER_TFF_COLLISION if self.collisions_enabled else DT_OVER_TFF)
         self.view_radius = VIEW_RADIUS_FACTOR * self.radius
 
         self.mass_min_real = float(self.state.m.min().item())
         self.mass_max_real = float(self.state.m.max().item())
         self.mass_ratio_real = self.mass_max_real / self.mass_min_real
         self.marker_sizes, self.marker_colors = self._mass_visuals(self.state.m)
+
+        # Collision resolution, OFF by default (--collisions and --chi were already read above,
+        # before the state was built, because they decide the working dtype). config.SOFTENING is
+        # fixed and positive throughout this script, so integrate()'s "collision requires
+        # softening > 0.0" guard is always satisfied here; nothing more to validate at this point
+        # (--chi <= 0.0 was already rejected in parse_args, before the GPU was touched). m_bar is
+        # this run's target mean mass (--mass, the same scale random_sphere's spectrum was
+        # generated around), not the hardcoded config.PARTICLE_MASS default, so the contact-radius
+        # formula stays consistent with whatever mass scale the user chose. v_coh is computed once
+        # here, from the realized initial state and the initial sphere radius (Sec. 4.6: v_coh =
+        # V_CHAR = sqrt(G M_real / R_0)), and held fixed for the run -- it is an initial-condition-
+        # derived scale, not a per-frame quantity, exactly like t_ff and dt above.
+        self.n_live = self.n
+        if self.collisions_enabled:
+            r_ref = self.chi * config.SOFTENING
+            v_coh = collisions.v_coh_from_state(self.state, self.radius)
+            self.collision_model = collisions.CollisionModel(r_ref, self.mass, v_coh=v_coh)
+            # integrate() draws exactly 2 uniform samples per accepted collision event from this
+            # generator (Sec. 4.7.1), and that draw sequence must be continuous over the whole
+            # run, not restarted at every integrate() call: on_timer calls integrate() once per
+            # rendered frame, so the SAME np.random.Generator instance is created here, once, and
+            # passed to every one of those calls (never rebuilt per frame -- rebuilding it would
+            # restart the stream and bias the elastic/merger/fragment channel mix, as measured
+            # before integrate() grew the collision_rng parameter that lets a caller own it).
+            self.collision_rng = np.random.default_rng(self.collision_model.seed)
+            self.n_elastic_total = 0
+            self.n_merge_total = 0
+            self.n_fragment_total = 0
+            self.e_int_total = 0.0
+            self.c_coll_max = 0.0
+            self.f_reject_max = 0.0
+        else:
+            self.collision_model = None
+            self.collision_rng = None
 
         self.e0 = total_energy(self.state, softening=config.SOFTENING)
         self.step_count = 0
@@ -319,6 +490,88 @@ class Viewer:
         colors = base[None, :] + t[:, None] * (heavy - base)[None, :]
         return sizes, colors
 
+    def _mass_visuals_live(self, m_live: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+        """
+        Per-frame marker size and color for the live subset, used only when --collisions is on.
+        Unlike _mass_visuals (computed once, masses fixed for the whole run), this is called every
+        frame, because merges and fragmentations change masses -- and slot occupancy -- as the run
+        goes.
+
+        Size normalizes against the CURRENT frame's live mass range, not the fixed absolute range
+        MARKER_SIZE_MIN/MAX was calibrated for (that calibration targets the ~500x initial
+        Salpeter-tail ratio, docs/simulacao-estocastica.md Sec. 2.5). A merger can carry a single
+        body to ~300x the mean and still rising, and by construction that body IS the frame's
+        current maximum: reusing the fixed clamp would either saturate every already-heavy body at
+        MARKER_SIZE_MAX (the dominant body stops being visually distinct from ordinary heavy
+        bodies) or, if the clamp were widened to fit the new maximum, push the debris field toward
+        MARKER_SIZE_MIN and off the edge of visibility. Stretching [current_min, current_max] onto
+        [MARKER_SIZE_MIN, MARKER_SIZE_MAX] every frame keeps the full visible range in use at all
+        times, so a body's growth always shows relative to whatever else is alive that frame.
+
+        Color reuses the same mean-relative cube-root ramp as _mass_visuals -- already
+        self-adaptive, since it renormalizes against the current max ratio on every call -- just
+        invoked on the live subset each frame instead of once on the full initial array.
+        """
+        r = np.cbrt(m_live.astype(np.float64))
+        r_min = r.min()
+        r_max = r.max()
+        span = r_max - r_min
+        t = (r - r_min) / span if span > 1e-300 else np.zeros_like(r)
+        sizes = MARKER_SIZE_MIN + t * (MARKER_SIZE_MAX - MARKER_SIZE_MIN)
+
+        m64 = m_live.astype(np.float64)
+        mean = m64.mean()
+        ratio = np.cbrt(m64 / mean)
+        ratio_span = float(ratio.max() - 1.0)
+        tc = np.clip((ratio - 1.0) / ratio_span, 0.0, 1.0) if ratio_span > 1e-12 else np.zeros_like(ratio)
+        base = np.array(BASE_COLOR, dtype=np.float64)
+        heavy = np.array(HEAVY_COLOR, dtype=np.float64)
+        colors = base[None, :] + tc[:, None] * (heavy - base)[None, :]
+        return sizes, colors
+
+    def _update_markers(self) -> np.ndarray:
+        """
+        Cross the current frame's state from device to host and redraw the marker set. Returns the
+        positions actually drawn, for the caller's auto-stop dispersal check.
+
+        Only what the renderer needs crosses per frame: the (N, 3) positions, and -- only with
+        --collisions on, since only then can masses or slot occupancy change -- the (N,) masses.
+        Velocities and the integrator's internal acceleration buffer never leave the device.
+
+        With --collisions off this is exactly the original single set_data call (extracted into
+        its own method, not changed), so --cold and the plain random_sphere path render
+        bit-for-bit identically to before this method existed. With --collisions on, dead slots
+        (m == 0, left behind by a merger, carrying the surviving body's own position -- Sec.
+        4.9(0)) are dropped before drawing: left in, they would render as phantom markers exactly
+        on top of the body that absorbed them.
+        """
+        if self.collisions_enabled:
+            m_cpu = self.state.m.detach().to("cpu").numpy()
+            live_mask = m_cpu > 0
+            self.n_live = int(live_mask.sum())
+            pos = self.state.r.detach().to("cpu").numpy()[live_mask]
+            sizes, colors = self._mass_visuals_live(m_cpu[live_mask])
+            self.markers.set_data(pos, face_color=colors, size=sizes, edge_width=0)
+        else:
+            pos = self.state.r.detach().to("cpu").numpy()
+            self.markers.set_data(pos, face_color=self.marker_colors, size=self.marker_sizes, edge_width=0)
+        return pos
+
+    def _accumulate_collision_stats(self, frame_stats) -> None:
+        """
+        Fold one frame's CollisionRunStats into the run-long totals. integrate() builds a fresh
+        CollisionRunStats per call (covering only that call's STEPS_PER_FRAME steps), so the
+        running totals live here, in the viewer, not in the returned object. Cheap host-side
+        scalar bookkeeping only -- everything folded in here was already computed by the
+        collision pass inside integrate(); this adds no extra O(N) or O(N^2) work per frame.
+        """
+        self.n_elastic_total += frame_stats.n_elastic
+        self.n_merge_total += frame_stats.n_merge
+        self.n_fragment_total += frame_stats.n_fragment
+        self.e_int_total += frame_stats.delta_e_int
+        self.c_coll_max = max(self.c_coll_max, frame_stats.c_coll_max)
+        self.f_reject_max = max(self.f_reject_max, frame_stats.f_reject_max)
+
     def ic_status_line(self) -> str:
         ic_label = "cold_sphere" if self.cold else "random_sphere"
         return (
@@ -328,9 +581,10 @@ class Viewer:
 
     def _build_scene(self):
         ic_kind = "cold" if self.cold else "random"
+        precision_label = "fp64, collisions" if self.collisions_enabled else "fp32"
         self.canvas = scene.SceneCanvas(
             keys="interactive", size=(1000, 800), show=True, bgcolor="black",
-            title=f"{ic_kind} spherical collapse -- real time (GPU, fp32, velocity_verlet)",
+            title=f"{ic_kind} spherical collapse -- real time (GPU, {precision_label}, velocity_verlet)",
         )
         # Two-row grid: 3D view keeps 75% of the height and stays mouse-interactive; the
         # diagnostic plot below is interactive=False so dragging it cannot be mistaken for
@@ -343,9 +597,8 @@ class Viewer:
         self.plot_view.interactive = False
         self._build_energy_plot()
 
-        pos0 = self.state.r.detach().to("cpu").numpy()
         self.markers = scene.visuals.Markers(parent=self.view.scene)
-        self.markers.set_data(pos0, face_color=self.marker_colors, size=self.marker_sizes, edge_width=0)
+        self._update_markers()
 
         # vispy 0.16 Text does not lay out embedded "\n" correctly against anchor_y="top"
         # (only the last line ends up on screen); use one Text instance per HUD line instead,
@@ -392,6 +645,24 @@ class Viewer:
             "", pos=(10, self.canvas.size[1] - 12), color="white", font_size=8,
             anchor_x="left", anchor_y="bottom", parent=self.canvas.scene,
         )
+        # Quantity label, --collisions only: the panel plots a different quantity in that mode
+        # (|dE_total/E0|, E_total = K + U + E_int, instead of the collisionless |dE/E0|), and this
+        # names it on screen so the two are never mistaken for one another. It also states plainly
+        # that the curve is REPORTED, not a stopping criterion here (docs/simulacao-estocastica.md
+        # Sec. 4.10/4.13.6: the documented runaway-merger phenomenon drives max |E_int|/|E0| into
+        # [3, 40] by design, so judging the trajectory by this curve would flag the phenomenon
+        # itself) -- without that label, a viewer seeing the curve climb past where the 5% band
+        # sits could misread it as the integrator breaking down. Built once, here, and never
+        # touched again -- parameters (including whether --collisions is on) are fixed for the
+        # run. Added only in this mode so the collisionless / --cold canvas render is untouched --
+        # no new visual element appears where none did before.
+        if self.collisions_enabled:
+            scene.visuals.Text(
+                "log10 |dE_total/E0|  --  REPORTED, not a stopping criterion  "
+                "(E_total = K + U + E_int)",
+                pos=(self.canvas.size[0] / 2, panel_top + 12), color="white", font_size=8,
+                anchor_x="center", anchor_y="top", parent=self.canvas.scene,
+            )
 
     def _record_energy(self) -> None:
         """
@@ -418,9 +689,10 @@ class Viewer:
         y = self._hist_y[: self._hist_n]
         self.energy_line.set_data(np.column_stack([x, y]))
 
-        # The y range covers the data and the 5% band, and nothing more: forcing |dE/E0| = 1
-        # (the stopping criterion) into view as well would waste over a decade of a panel that
-        # is only a quarter of the canvas tall, and the trace is what needs the room.
+        # The y range covers the data and the 5% band, and nothing more: forcing |dE/E0| = 1 (the
+        # stopping criterion without --collisions; with --collisions it is not one -- see
+        # ENERGY_ERROR_LIMIT's docstring) into view as well would waste over a decade of a panel
+        # that is only a quarter of the canvas tall, and the trace is what needs the room.
         x_hi = max(x[-1], 1e-6) * 1.05 if self._hist_n else 1.0
         y_min = min(y.min(), ENERGY_BAND_LOG10) if self._hist_n else ENERGY_BAND_LOG10 - 1.0
         y_max = max(y.max(), ENERGY_BAND_LOG10) if self._hist_n else ENERGY_BAND_LOG10
@@ -433,22 +705,48 @@ class Viewer:
 
     def on_timer(self, event):
         if not self.frozen:
-            self.state = integrate(
-                self.state, integrator="velocity_verlet", backend=self.backend,
-                dt=self.dt, n_steps=STEPS_PER_FRAME, softening=config.SOFTENING,
-            )
-            self.step_count += STEPS_PER_FRAME
+            if self.collisions_enabled:
+                # integrate() returns (State, CollisionRunStats) whenever collision is not None,
+                # instead of the plain State the collisionless call below returns -- the two
+                # branches exist because of that return-type difference, not for any other reason.
+                self.state, frame_stats = integrate(
+                    self.state, integrator="velocity_verlet", backend=self.backend,
+                    dt=self.dt, n_steps=STEPS_PER_FRAME_COLLISION, softening=config.SOFTENING,
+                    collision=self.collision_model, collision_rng=self.collision_rng,
+                )
+                self._accumulate_collision_stats(frame_stats)
+                self.step_count += STEPS_PER_FRAME_COLLISION
+            else:
+                self.state = integrate(
+                    self.state, integrator="velocity_verlet", backend=self.backend,
+                    dt=self.dt, n_steps=STEPS_PER_FRAME, softening=config.SOFTENING,
+                )
+                self.step_count += STEPS_PER_FRAME
             self.sim_time = self.step_count * self.dt
 
+            # e is always K + U (total_energy, unchanged). With --collisions, the honest
+            # conserved-up-to-dissipation quantity is E_total = K + U + E_int (E_int is the
+            # cumulative collisional ledger folded in by _accumulate_collision_stats above, not
+            # recomputed here -- no extra O(N^2) pass), and self.rel_error becomes |dE_total/E0|
+            # instead of |dE/E0|; every reader of self.rel_error below (HUD, energy panel,
+            # auto-stop) is written to that quantity, whichever it currently is.
             e = total_energy(self.state, softening=config.SOFTENING)
-            self.rel_error = abs((e - self.e0) / self.e0)
+            if self.collisions_enabled:
+                e_total = e + self.e_int_total
+                self.rel_error = abs((e_total - self.e0) / self.e0)
+            else:
+                self.rel_error = abs((e - self.e0) / self.e0)
             self._record_energy()
 
-            pos = self.state.r.detach().to("cpu").numpy()
-            self.markers.set_data(pos, face_color=self.marker_colors, size=self.marker_sizes, edge_width=0)
+            pos = self._update_markers()
             self._update_plot()
 
-            if self.rel_error > ENERGY_ERROR_LIMIT:
+            # The energy auto-stop applies ONLY without --collisions -- see ENERGY_ERROR_LIMIT's
+            # docstring: with --collisions, |dE_total/E0| is a REPORTED quantity (the documented
+            # runaway-merger phenomenon drives it far past 1 by design), not a stopping criterion,
+            # so it must never freeze the simulation here. The dispersal check applies in both
+            # modes unchanged.
+            if not self.collisions_enabled and self.rel_error > ENERGY_ERROR_LIMIT:
                 self._freeze(
                     f"stopped: |dE/E0| = {self.rel_error:.3f} exceeded {ENERGY_ERROR_LIMIT:.0f} "
                     f"at t = {self.sim_time / self.t_ff:.3f} t_ff -- trajectory no longer physical"
@@ -474,15 +772,33 @@ class Viewer:
         alpha = 0.1
         self.fps_ema = inst_fps if self.fps_ema == 0.0 else (1 - alpha) * self.fps_ema + alpha * inst_fps
 
-        lines = [
-            f"backend: {self.backend_name}   dtype: float32   N: {self.n}",
-            self.ic_status_line(),
-            f"integrator: velocity_verlet   steps/frame: {STEPS_PER_FRAME}   "
-            f"dt: {self.dt:.4e} s ({DT_OVER_TFF:.2e} t_ff)",
-            f"fps: {self.fps_ema:6.1f}   t = {self.sim_time / self.t_ff:7.4f} t_ff   step {self.step_count}",
-            f"|dE/E0| = {self.rel_error:.4e}",
-            "SIMULATION FROZEN -- camera still interactive" if self.frozen else "",
-        ]
+        freeze_line = "SIMULATION FROZEN -- camera still interactive" if self.frozen else ""
+
+        if self.collisions_enabled:
+            lines = [
+                f"backend: {self.backend_name}   dtype: float64   N: {self.n}",
+                self.ic_status_line(),
+                f"integrator: velocity_verlet   steps/frame: {STEPS_PER_FRAME_COLLISION}   "
+                f"dt: {self.dt:.4e} s ({DT_OVER_TFF_COLLISION:.2e} t_ff)",
+                f"fps: {self.fps_ema:6.1f}   t = {self.sim_time / self.t_ff:7.4f} t_ff   step {self.step_count}",
+                f"collisions: ON   chi: {self.chi:.4g}   N_live: {self.n_live}/{self.n}",
+                f"events -- elastic: {self.n_elastic_total}   merge: {self.n_merge_total}   "
+                f"fragment: {self.n_fragment_total}",
+                f"REPORTED, not a stopping criterion: E_int/|E0| = {self.e_int_total / abs(self.e0):.4e}   "
+                f"|dE_total/E0| = {self.rel_error:.4e}",
+                freeze_line,
+            ]
+        else:
+            # Unchanged from before --collisions existed: same 6 lines, same content, same order.
+            lines = [
+                f"backend: {self.backend_name}   dtype: float32   N: {self.n}",
+                self.ic_status_line(),
+                f"integrator: velocity_verlet   steps/frame: {STEPS_PER_FRAME}   "
+                f"dt: {self.dt:.4e} s ({DT_OVER_TFF:.2e} t_ff)",
+                f"fps: {self.fps_ema:6.1f}   t = {self.sim_time / self.t_ff:7.4f} t_ff   step {self.step_count}",
+                f"|dE/E0| = {self.rel_error:.4e}",
+                freeze_line,
+            ]
         self.hud.text = lines
 
 
