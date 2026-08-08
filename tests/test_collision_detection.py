@@ -11,20 +11,23 @@ INV-18(a) -- t* = clamp(-dr.dv/|dv|^2, 0, h) minimizes |dr + t dv|^2 on [0, h]. 
       SPECIFICATION's own algebraic claim; every other test in this module (and in the real
       detector) depends on it being right.
 
-  (2) best-effort against the real nbody.collisions.detect/CollisionModel, via the semantic-role
-      binder in _stage2_binding.py (Section 9.1 gives this module's names but not detect's
-      parameter list or return type -- a genuine contract gap, see the final report). Skips
-      loudly, never vacuously, when the calling convention or return shape cannot be resolved.
+  (2) against the real nbody.collisions.detect/CollisionModel, called with the NORMATIVE
+      signatures Section 9.1.1 now fixes (CollisionModel(r_ref, m_bar, *, v_coh, seed),
+      detect(state, dt, model) -> CollisionCandidates(i, j, t_star, rel_speed,
+      contact_radius_sum)). Section 9.1.1 explicitly authorizes retiring the semantic-role-binder
+      workaround this module used before that section existed (tests/_stage2_binding.py is
+      UNCHANGED and still used by other test files for gaps Section 9.1.1 does not close --
+      nbody.populations' signatures -- but this module no longer needs it).
 
 INV-18(b) -- tunneling is possible in the perturbative regime (CHI_DEFAULT), and this is
 Section 4.4's own justification for DT_COLLISION: a check that only looks at separation at the
 START and END of a step ("static") can find both endpoints clear of contact while the true
 minimum, strictly inside the step, is below the contact radius. A two-body flyby configuration is
 built where this is verified to hold with comfortable, checked margin (not asserted a priori),
-and used both as a pure-geometry demonstration and, best-effort, against the real detector.
+and used both as a pure-geometry demonstration and against the real detector.
 
 Out of scope, deliberately: collision RESOLUTION (elastic/merger/fragmentation outcomes, E_int,
-L_spin -- INV-20..INV-24). Only detection (Section 4.3-4.4) is covered here.
+L_spin -- INV-20..INV-26, INV-32) -- covered by tests/test_collision_resolution.py.
 """
 from __future__ import annotations
 
@@ -42,13 +45,6 @@ try:
     import nbody.collisions as collisions
 except ImportError:
     collisions = None
-
-from _stage2_binding import (  # noqa: E402
-    ContractGap,
-    bind_by_role,
-    call_by_role,
-    extract_pair_records,
-)
 
 from tolerances import (  # noqa: E402
     CHI_DEFAULT,
@@ -309,19 +305,18 @@ class TestINV18bTunnelingDiscrimination:
 
 
 # -------------------------------------------------------------------------------------------
-# Against the real detector. Section 9.1 names nbody.collisions.CollisionModel's fields as
-# "r_ref, v_coh, b, w, frag_f_min, eta, seed" and gives detect's/CollisionCandidates' names but
-# not a parameter list or return-value shape in prose -- a real contract gap (see final report).
-# The gap is closed here NOT by reading src/nbody/collisions.py (never opened), but by
-# `inspect.signature`/`dataclasses.fields` introspection on the live, imported objects, which is
-# reading a declared public signature -- the same "forma" _stage2_binding.py's bind_by_role
-# already treats as fair game, not the algorithm behind it. As discovered this way (current
-# round; only detection is implemented, consistent with resolve()/INV-20..24 being out of
-# scope): CollisionModel(r_ref, m_bar), detect(state, dt, model) -> CollisionCandidates(i, j,
-# t_star, rel_speed, contact_radius_sum), pair_disjoint(candidates) -> AcceptedPairs(..., f_reject)
-# -- struct-of-arrays tensors, not a list of per-pair records. Every call below still falls back
-# to the role-binder and skips loudly on TypeError, so a future signature change degrades to a
-# labelled skip rather than a wrong pass or a crash.
+# Against the real detector. Section 9.1.1 now fixes, NORMATIVELY and LITERALLY, the signatures
+# this module used to have to discover via a semantic-role binder (tests/_stage2_binding.py,
+# retired from THIS module only -- other test files still use it for gaps Section 9.1.1 does not
+# close):
+#   CollisionModel(r_ref: float = R_REF_DEFAULT, m_bar: float = PARTICLE_MASS, *,
+#                  v_coh: float, seed: int = COLLISION_SEED)
+#   CollisionCandidates(i, j, t_star, rel_speed, contact_radius_sum: Tensor)  -- 1-D, same length
+#   detect(state, dt: float, model: CollisionModel) -> CollisionCandidates
+#   contact_radii(m: Tensor, model: CollisionModel) -> Tensor
+# v_coh has no default and is irrelevant to detect() (Section 9.1.1: detect/CollisionCandidates
+# don't touch it; only resolve() does, for E_bind) -- any finite value works here; V_CHAR is used
+# as a physically unremarkable default.
 # -------------------------------------------------------------------------------------------
 def _require_collisions_module():
     if collisions is None:
@@ -329,68 +324,28 @@ def _require_collisions_module():
     return collisions
 
 
-def _make_model(r_ref=R_REF_DEFAULT):
+def _make_model(r_ref=R_REF_DEFAULT, v_coh=config.V_CHAR):
     mod = _require_collisions_module()
-    model_cls = getattr(mod, "CollisionModel", None)
-    if model_cls is None:
-        pytest.skip("nbody.collisions.CollisionModel is not defined")
-    try:
-        return model_cls(r_ref=r_ref)
-    except TypeError:
-        try:
-            return call_by_role(model_cls, {"r_ref": r_ref, "chi": CHI_DEFAULT})
-        except ContractGap as exc:
-            pytest.skip(str(exc))
+    return mod.CollisionModel(r_ref=r_ref, v_coh=v_coh)
 
 
 def _call_detect(model, r, v, m, dt):
     mod = _require_collisions_module()
-    detect_fn = getattr(mod, "detect", None)
-    if detect_fn is None:
-        pytest.skip("nbody.collisions.detect is not defined")
     state = State(
         r=torch.as_tensor(np.asarray(r), dtype=torch.float64),
         v=torch.as_tensor(np.asarray(v), dtype=torch.float64),
         m=torch.as_tensor(np.asarray(m), dtype=torch.float64),
     )
-    try:
-        return detect_fn(state, dt, model)
-    except TypeError:
-        roles = {"state": state, "dt": dt, "h": dt, "model": model, "collision_model": model}
-        try:
-            kwargs = bind_by_role(detect_fn, roles)
-        except ContractGap as exc:
-            pytest.skip(str(exc))
-        try:
-            return detect_fn(**kwargs)
-        except Exception as exc:
-            pytest.skip(f"detect() bound but raised {type(exc).__name__}: {exc}")
+    return mod.detect(state, dt, model)
 
 
 def _pairs_from_soa(result):
-    """
-    CollisionCandidates/AcceptedPairs are dataclasses of 1-D tensors (i, j, t_star, ...): a
-    struct-of-arrays over ALL candidates in one call, discovered via dataclasses.fields, not a
-    list of per-pair objects. Falls back to extract_pair_records for a list-shaped return value,
-    in case that shape changes.
-    """
-    i, j = getattr(result, "i", None), getattr(result, "j", None)
-    if i is not None and j is not None:
-        i_np = i.detach().cpu().numpy() if hasattr(i, "detach") else np.asarray(i)
-        j_np = j.detach().cpu().numpy() if hasattr(j, "detach") else np.asarray(j)
-        t_star = getattr(result, "t_star", None)
-        if t_star is not None:
-            t_np = t_star.detach().cpu().numpy() if hasattr(t_star, "detach") else np.asarray(t_star)
-        else:
-            t_np = [None] * len(i_np)
-        return [(int(a), int(b), None if t is None else float(t)) for a, b, t in zip(i_np, j_np, t_np)]
-    try:
-        return extract_pair_records(list(result))
-    except (ContractGap, TypeError):
-        raise ContractGap(
-            f"could not extract (i, j) candidates from a value of type {type(result)!r}: "
-            f"neither struct-of-arrays 'i'/'j' tensor fields nor a list of per-pair records"
-        )
+    """CollisionCandidates is a struct-of-arrays dataclass (i, j, t_star, ... 1-D tensors),
+    normative per Section 9.1.1 -- read its fields directly."""
+    i_np = result.i.detach().cpu().numpy()
+    j_np = result.j.detach().cpu().numpy()
+    t_np = result.t_star.detach().cpu().numpy()
+    return [(int(a), int(b), float(t)) for a, b, t in zip(i_np, j_np, t_np)]
 
 
 class TestINV18RealDetector:
@@ -407,10 +362,7 @@ class TestINV18RealDetector:
         m = np.array([MASS_MIN, MASS_MIN])
 
         result = _call_detect(model, r, v_half_step, m, h)
-        try:
-            pairs = _pairs_from_soa(result)
-        except ContractGap as exc:
-            pytest.skip(str(exc))
+        pairs = _pairs_from_soa(result)
 
         found = {(min(i, j), max(i, j)) for i, j, _ in pairs}
         assert (0, 1) in found, (
@@ -435,13 +387,9 @@ class TestINV18RealDetector:
         m = np.array([MASS_MIN, MASS_MIN])
 
         result = _call_detect(model, r, v_half_step, m, h)
-        try:
-            pairs = _pairs_from_soa(result)
-        except ContractGap as exc:
-            pytest.skip(str(exc))
+        pairs = _pairs_from_soa(result)
         matches = [t for i, j, t in pairs if (min(i, j), max(i, j)) == (0, 1)]
-        if not matches or matches[0] is None:
-            pytest.skip("detect()'s return value does not expose t_star per candidate")
+        assert matches, "detect() did not report the (0, 1) pair at all"
         t_reported = matches[0]
 
         dr = r[1] - r[0]
@@ -464,10 +412,7 @@ class TestINV18RealDetector:
         m = np.array([config.PARTICLE_MASS, config.PARTICLE_MASS])
 
         result = _call_detect(model, r, v_half_step, m, DT_COLLISION)
-        try:
-            pairs = _pairs_from_soa(result)
-        except ContractGap as exc:
-            pytest.skip(str(exc))
+        pairs = _pairs_from_soa(result)
         found = {(min(i, j), max(i, j)) for i, j, _ in pairs}
         assert (0, 1) not in found, (
             f"detect() flagged a pair separated by 10x the contact radius, at rest -- false "
@@ -486,10 +431,7 @@ class TestINV18RealDetector:
         m = np.array([MASS_MIN, MASS_MIN])
 
         result = _call_detect(model, r, v_half_step, m, DT_COLLISION)
-        try:
-            pairs = _pairs_from_soa(result)
-        except ContractGap as exc:
-            pytest.skip(str(exc))
+        pairs = _pairs_from_soa(result)
         found = {(min(i, j), max(i, j)) for i, j, _ in pairs}
         assert (0, 1) not in found, (
             f"detect() flagged an overlapping pair that is SEPARATING (dr.dv > 0 at t=0) as a "
@@ -498,19 +440,13 @@ class TestINV18RealDetector:
         )
 
     def test_contact_radii_matches_section_4_1_formula(self):
-        # nbody.collisions.contact_radii(m, model) -> Tensor, discovered the same way. Section
-        # 4.1: R_i = R_ref * (m_i / m_bar)^(1/3).
+        # nbody.collisions.contact_radii(m, model) -> Tensor. Section 4.1: R_i = R_ref *
+        # (m_i / m_bar)^(1/3). Normative per Section 9.1.1.
         mod = _require_collisions_module()
-        fn = getattr(mod, "contact_radii", None)
-        if fn is None:
-            pytest.skip("nbody.collisions.contact_radii is not defined")
         model = _make_model()
-        m_bar = getattr(model, "m_bar", config.PARTICLE_MASS)
+        m_bar = model.m_bar
         m = torch.tensor([MASS_MIN, m_bar, config.PARTICLE_MASS * 284.60], dtype=torch.float64)
-        try:
-            radii = fn(m, model)
-        except TypeError:
-            pytest.skip("contact_radii's parameter list does not match (m, model)")
-        radii_np = radii.detach().cpu().numpy() if hasattr(radii, "detach") else np.asarray(radii)
+        radii = mod.contact_radii(m, model)
+        radii_np = radii.detach().cpu().numpy()
         expected = R_REF_DEFAULT * (m.numpy() / m_bar) ** (1.0 / 3.0)
         np.testing.assert_allclose(radii_np, expected, rtol=1e-12)

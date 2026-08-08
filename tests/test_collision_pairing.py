@@ -22,17 +22,12 @@ any physical outcome map -- because Section 4.5's mass-conservation claim for th
 is purely combinatorial (disjoint accepted pairs -> per-pair maps commute and act on disjoint
 mass groups), independent of which physical outcome each pair receives.
 
-Section 9.1 gives nbody.collisions.CollisionModel's field names in prose but fixes neither
-pair_disjoint's parameter list nor the type of a "candidate"/"event" record -- a real contract
-gap (see final report). Closed here NOT by reading src/nbody/collisions.py (never opened), but
-by `inspect.signature`/`dataclasses.fields` introspection on the live, imported objects -- the
-same "declared signature is fair game, algorithm is not" rule tests/test_random_sphere.py and
-_stage2_binding.py already use. As discovered this way (current round):
-pair_disjoint(candidates: CollisionCandidates) -> AcceptedPairs, both dataclasses of 1-D tensors
-(i, j, t_star, rel_speed, contact_radius_sum[, f_reject]) -- struct-of-arrays over ALL candidates
-in one call, not a list of per-pair objects. Every call below still falls back to
-_stage2_binding.py's try_calls/extract_pair_records and skips loudly on TypeError, so a future
-signature change degrades to a labelled skip rather than a silent wrong pass.
+Section 9.1.1 now fixes, NORMATIVELY and LITERALLY, the signatures this module used to have to
+discover via a semantic-role binder (tests/_stage2_binding.py, retired from THIS module only --
+other test files still use it for gaps Section 9.1.1 does not close, e.g. nbody.populations'
+signatures): pair_disjoint(candidates: CollisionCandidates) -> AcceptedPairs, both dataclasses of
+1-D tensors (i, j, t_star, rel_speed, contact_radius_sum[, f_reject: float]) -- struct-of-arrays
+over ALL candidates in one call, not a list of per-pair objects.
 """
 from __future__ import annotations
 
@@ -49,8 +44,6 @@ try:
     import nbody.collisions as collisions
 except ImportError:
     collisions = None
-
-from _stage2_binding import ContractGap, extract_pair_records, try_calls  # noqa: E402
 
 from tolerances import EPS_PREC_FP64, TOL_REJECT_MAX  # noqa: E402
 
@@ -91,111 +84,42 @@ def _reference_pair_disjoint(triples):
     return accepted, rejected
 
 
-def _candidate_representations(triples):
+def _make_candidates(triples):
     """
-    Plausible element types for a 'candidate', tried in order. The FIRST is the struct-of-arrays
-    CollisionCandidates shape discovered via dataclasses.fields (i, j, t_star as 1-D tensors,
-    plus rel_speed/contact_radius_sum filled with harmless placeholder values -- pair_disjoint's
-    documented job, Section 4.5 steps 1-2, uses only t*/i/j to decide acceptance). The rest are
-    generic AoS fallbacks tried only if that fails, in case the type changes later.
+    CollisionCandidates(i, j, t_star, rel_speed, contact_radius_sum), normative per Section
+    9.1.1. rel_speed/contact_radius_sum are filled with harmless placeholder values --
+    pair_disjoint's documented job (Section 4.5 steps 1-2) uses only t*/i/j to decide acceptance.
     """
     n = len(triples)
-    reps = []
-    cc_cls = getattr(collisions, "CollisionCandidates", None) if collisions is not None else None
-    if cc_cls is not None:
-        try:
-            reps.append(cc_cls(
-                i=torch.tensor([t[1] for t in triples], dtype=torch.int64),
-                j=torch.tensor([t[2] for t in triples], dtype=torch.int64),
-                t_star=torch.tensor([t[0] for t in triples], dtype=torch.float64),
-                rel_speed=torch.ones(n, dtype=torch.float64),
-                contact_radius_sum=torch.full((n,), 0.01, dtype=torch.float64),
-            ))
-        except TypeError:
-            pass
-    reps.extend([
-        [{"t_star": t, "i": i, "j": j} for (t, i, j) in triples],
-        [{"t": t, "i": i, "j": j} for (t, i, j) in triples],
-        [(t, i, j) for (t, i, j) in triples],
-        [(i, j, t) for (t, i, j) in triples],
-    ])
-    return reps
+    return collisions.CollisionCandidates(
+        i=torch.tensor([t[1] for t in triples], dtype=torch.int64),
+        j=torch.tensor([t[2] for t in triples], dtype=torch.int64),
+        t_star=torch.tensor([t[0] for t in triples], dtype=torch.float64),
+        rel_speed=torch.ones(n, dtype=torch.float64),
+        contact_radius_sum=torch.full((n,), 0.01, dtype=torch.float64),
+    )
 
 
 def _call_pair_disjoint(triples):
     if collisions is None:
         pytest.skip("nbody.collisions is not importable")
-    fn = getattr(collisions, "pair_disjoint", None)
-    if fn is None:
-        pytest.skip("nbody.collisions.pair_disjoint is not defined")
-
-    attempts = []
-    for rep in _candidate_representations(triples):
-        attempts.append(((rep,), {}))
-    for rep in _candidate_representations(triples):
-        attempts.append(((), {"candidates": rep}))
-
-    try:
-        result, _ = try_calls(fn, attempts)
-        return result
-    except ContractGap as exc:
-        pytest.skip(str(exc))
+    return collisions.pair_disjoint(_make_candidates(triples))
 
 
 def _extract_accepted(result):
-    # AcceptedPairs is a struct-of-arrays dataclass (i, j, t_star, ... tensors), discovered via
-    # dataclasses.fields; try that shape first, then fall back to an AoS reading.
-    i, j = getattr(result, "i", None), getattr(result, "j", None)
-    if i is not None and j is not None:
-        i_np = i.detach().cpu().numpy() if hasattr(i, "detach") else np.asarray(i)
-        j_np = j.detach().cpu().numpy() if hasattr(j, "detach") else np.asarray(j)
-        t_star = getattr(result, "t_star", None)
-        if t_star is not None:
-            t_np = t_star.detach().cpu().numpy() if hasattr(t_star, "detach") else np.asarray(t_star)
-        else:
-            t_np = [None] * len(i_np)
-        # returned as (t_star, i, j), matching the (t_star, i, j) convention used everywhere
-        # else in this module (_CONFLICT_CANDIDATES, _reference_pair_disjoint, ...).
-        return [(None if t is None else float(t), int(a), int(b)) for a, b, t in zip(i_np, j_np, t_np)]
-
-    candidates_to_try = [result]
-    if isinstance(result, tuple) and len(result) > 0:
-        candidates_to_try.append(result[0])
-    for name in ("accepted", "events", "candidates"):
-        candidates_to_try.append(getattr(result, name, None))
-    for candidate in candidates_to_try:
-        if candidate is None:
-            continue
-        try:
-            return extract_pair_records(list(candidate))
-        except (ContractGap, TypeError):
-            continue
-    raise ContractGap(
-        f"could not extract accepted (i, j, t_star) records from pair_disjoint's return value "
-        f"(type {type(result)!r})"
-    )
+    # AcceptedPairs is a struct-of-arrays dataclass (i, j, t_star, ... 1-D tensors), normative
+    # per Section 9.1.1.
+    i_np = result.i.detach().cpu().numpy()
+    j_np = result.j.detach().cpu().numpy()
+    t_np = result.t_star.detach().cpu().numpy()
+    # returned as (t_star, i, j), matching the (t_star, i, j) convention used everywhere else in
+    # this module (_CONFLICT_CANDIDATES, _reference_pair_disjoint, ...).
+    return [(float(t), int(a), int(b)) for a, b, t in zip(i_np, j_np, t_np)]
 
 
 def _extract_f_reject(result, n_candidates):
-    direct_names = ("f_reject", "reject_fraction", "rejected_fraction")
-    containers = [result]
-    if isinstance(result, tuple):
-        containers.extend(result)
-    for container in containers:
-        for name in direct_names:
-            if isinstance(container, dict) and name in container:
-                return float(container[name])
-            if hasattr(container, name):
-                return float(getattr(container, name))
-    count_names = ("n_rejected", "num_rejected", "rejected_count")
-    for container in containers:
-        for name in count_names:
-            if hasattr(container, name):
-                return float(getattr(container, name)) / n_candidates
-    raise ContractGap(
-        f"f_reject is not exposed on pair_disjoint's return value (type {type(result)!r}); "
-        f"tried direct fields {direct_names} and count fields {count_names}"
-    )
+    # AcceptedPairs.f_reject: float, normative per Section 9.1.1.
+    return float(result.f_reject)
 
 
 # -------------------------------------------------------------------------------------------
@@ -240,10 +164,7 @@ class TestINV19aMassConservationUnderGenuineConflicts:
 
     def test_toy_merge_conserves_mass_over_a_conflicting_candidate_set(self):
         real_result = _call_pair_disjoint(_CONFLICT_CANDIDATES)
-        try:
-            real_accepted = _extract_accepted(real_result)
-        except ContractGap as exc:
-            pytest.skip(str(exc))
+        real_accepted = _extract_accepted(real_result)
 
         real_pairs = {(min(i, j), max(i, j)) for _, i, j in real_accepted}
 
@@ -274,10 +195,7 @@ class TestINV19bNoSlotInTwoEvents:
 
     def test_accepted_pairs_do_not_share_a_slot(self):
         real_result = _call_pair_disjoint(_CONFLICT_CANDIDATES)
-        try:
-            real_accepted = _extract_accepted(real_result)
-        except ContractGap as exc:
-            pytest.skip(str(exc))
+        real_accepted = _extract_accepted(real_result)
         claimed = []
         for _, i, j in real_accepted:
             claimed.extend([i, j])
@@ -287,10 +205,7 @@ class TestINV19bNoSlotInTwoEvents:
 
     def test_every_accepted_pair_was_a_real_candidate(self):
         real_result = _call_pair_disjoint(_CONFLICT_CANDIDATES)
-        try:
-            real_accepted = _extract_accepted(real_result)
-        except ContractGap as exc:
-            pytest.skip(str(exc))
+        real_accepted = _extract_accepted(real_result)
         candidate_pairs = {(min(i, j), max(i, j)) for _, i, j in _CONFLICT_CANDIDATES}
         for _, i, j in real_accepted:
             pair = (min(i, j), max(i, j))
@@ -301,10 +216,7 @@ class TestINV19bNoSlotInTwoEvents:
 
     def test_accepted_set_matches_the_reference_greedy_algorithm(self):
         real_result = _call_pair_disjoint(_CONFLICT_CANDIDATES)
-        try:
-            real_accepted = _extract_accepted(real_result)
-        except ContractGap as exc:
-            pytest.skip(str(exc))
+        real_accepted = _extract_accepted(real_result)
         real_pairs = {(min(i, j), max(i, j)) for _, i, j in real_accepted}
         assert real_pairs == _CONFLICT_EXPECTED_ACCEPTED, (
             f"pair_disjoint's accepted set {real_pairs} differs from the reference greedy "
@@ -326,11 +238,8 @@ class TestINV19cDeterminism:
     def test_repeated_calls_on_the_same_input_agree(self):
         result_1 = _call_pair_disjoint(_CONFLICT_CANDIDATES)
         result_2 = _call_pair_disjoint(_CONFLICT_CANDIDATES)
-        try:
-            accepted_1 = _extract_accepted(result_1)
-            accepted_2 = _extract_accepted(result_2)
-        except ContractGap as exc:
-            pytest.skip(str(exc))
+        accepted_1 = _extract_accepted(result_1)
+        accepted_2 = _extract_accepted(result_2)
         pairs_1 = {(min(i, j), max(i, j)) for _, i, j in accepted_1}
         pairs_2 = {(min(i, j), max(i, j)) for _, i, j in accepted_2}
         assert pairs_1 == pairs_2, (
@@ -348,11 +257,8 @@ class TestINV19cDeterminism:
         ]
         result_original = _call_pair_disjoint(_CONFLICT_CANDIDATES)
         result_shuffled = _call_pair_disjoint(shuffled)
-        try:
-            accepted_original = _extract_accepted(result_original)
-            accepted_shuffled = _extract_accepted(result_shuffled)
-        except ContractGap as exc:
-            pytest.skip(str(exc))
+        accepted_original = _extract_accepted(result_original)
+        accepted_shuffled = _extract_accepted(result_shuffled)
         pairs_original = {(min(i, j), max(i, j)) for _, i, j in accepted_original}
         pairs_shuffled = {(min(i, j), max(i, j)) for _, i, j in accepted_shuffled}
         assert pairs_original == pairs_shuffled == _CONFLICT_EXPECTED_ACCEPTED, (
@@ -376,11 +282,8 @@ class TestINV19cDeterminism:
 
         result_forward = _call_pair_disjoint(tied)
         result_reversed = _call_pair_disjoint(reversed_tied)
-        try:
-            accepted_forward = _extract_accepted(result_forward)
-            accepted_reversed = _extract_accepted(result_reversed)
-        except ContractGap as exc:
-            pytest.skip(str(exc))
+        accepted_forward = _extract_accepted(result_forward)
+        accepted_reversed = _extract_accepted(result_reversed)
 
         pairs_forward = {(min(i, j), max(i, j)) for _, i, j in accepted_forward}
         pairs_reversed = {(min(i, j), max(i, j)) for _, i, j in accepted_reversed}
@@ -417,10 +320,7 @@ class TestINV19dRejectFraction:
 
     def test_f_reject_is_exposed_and_matches_the_known_pass_result(self):
         result = _call_pair_disjoint(_CONFLICT_CANDIDATES)
-        try:
-            f_reject = _extract_f_reject(result, n_candidates=len(_CONFLICT_CANDIDATES))
-        except ContractGap as exc:
-            pytest.skip(f"INV-19(d) untestable: {exc}")
+        f_reject = _extract_f_reject(result, n_candidates=len(_CONFLICT_CANDIDATES))
         expected = len(_CONFLICT_EXPECTED_REJECTED) / len(_CONFLICT_CANDIDATES)
         assert math.isclose(f_reject, expected, rel_tol=1e-9), (
             f"f_reject={f_reject} does not match n_rejected/n_candidates={expected} for the "
