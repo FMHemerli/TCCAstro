@@ -2444,9 +2444,10 @@ como resultado.** Cinco razões, em ordem de peso:
 2. **O critério de aceitação declarado pelo usuário está satisfeito.** "Terminar em um corpo só não é
    falha, desde que não aconteça sempre nem muito rápido." Não termina em um corpo: **`774` corpos
    sobrevivem**. E não é rápido: a transição toma ~~**`1.43 t_ff`, isto é `48%` da execução**~~
-   [**NÃO CONFIRMADO** — ver 4.13.7; medido no ensemble `0.70`/`0.62`/`0.54 t_ff`, todos acima do
-   piso `> 0.5 t_ff`, o que **preserva esta conclusão**], contra
-   `1.2%` na rodada 1. **[M]**
+   ~~[**NÃO CONFIRMADO** — medido no ensemble `0.70`/`0.62`/`0.54 t_ff`]~~ **`1.048 t_ff`, isto é
+   `35%` da execução** [definição fixada em 2026-08-09, Seção 4.13.9: `duracao := t_end - t_runaway`;
+   `0.70`/`0.62`/`0.54` também saíram de circulação, por virem de medidor sem definição], contra
+   `1.2%` na rodada 1 — **fator `29`**. **[M]**/**[T]**
 3. **O que se vê na tela melhorou muito, e é o melhor produto disponível.** Comparação direta:
    - **rodada 1:** transição em `1.2%` do tempo — na tela lê como **glitch**;
    - **rodada 3 (atual):** colapso frio, rebote em `1.04 t_ff`, e a partir de `~1.5 t_ff` **um objeto
@@ -2485,12 +2486,26 @@ variando apenas a semente de colisão):**
 N_final              ∈  [700, 900]                                                  [M]->[A]
 t_50                 >  3 t_ff        (N_live nunca cai a 500)                       [A]
 t_runaway            ∈  [1.2, 2.0] t_ff   (primeiro t com max m_i/M_real >= 0.10)     [A]
+                        ^^^ BANDA RETIRADA em 2026-08-09, Sec. 4.13.8(5).  t_runaway
+                            passa a NUMERO REPORTADO.  A linha e' preservada aqui como
+                            registro do que foi predito e testado no ensemble de 4.13.7,
+                            onde PASSOU 3/3 -- por margens de 0.6% a 2.4% do teto.
 max_i m_i / M_real   ∈  [0.15, 0.60] em t = 3 t_ff                                   [A]
 duracao da transicao >  0.5 t_ff      (isto e: >= 17% da execucao, NAO um degrau)     [A]
+                        ^^^ RETIRADA das predicoes em 2026-08-09, Sec. 4.13.9: a grandeza
+                            nao tinha definicao operacional.  Definida agora como
+                            t_end - t_runaway, e sob essa definicao o criterio nao pode
+                            falhar -- logo vira numero reportado, nao predicao.
 max_t |E_int|/|E_0|  ∈  [3, 40]                                                      [A]
 canais               cada um >= 5%                                                   [M] 28.1/6.9/65.0
 massa, momento       exatos a n_events * eps_prec                                    [T]
 ```
+
+> **Escopo desta predição, e ele é literal.** O parágrafo acima diz **"semente de posições fixa,
+> variando apenas a semente de colisão"**. Isso é uma restrição registrada, não uma ressalva: a
+> campanha de **realizações** da Seção 4.13.8 está **fora** deste escopo, e portanto não confirma
+> nem refuta nenhuma linha desta caixa — nem as quatro que ela satisfaz, nem a que ela excede.
+> Ver 4.13.8(5), onde a simetria dessa leitura é o que a torna honesta.
 
 **As três que carregam conteúdo, e como falsificá-las:**
 
@@ -2665,21 +2680,25 @@ transição. A proposta natural, coerente com `(C7)`, é
 para `20190225`. **Isto NÃO é decidido aqui** — fixar a definição é mudar uma linha de uma predição
 falsificável, e este documento não o faz de passagem.
 
-> # MARCAÇÃO NORMATIVA — `1.43 t_ff` e `48%` estão NÃO CONFIRMADOS
+> # MARCAÇÃO NORMATIVA — SUPERADA em 2026-08-09 pela Seção 4.13.9; leia lá antes de citar
 >
 > **A partir de 2026-08-08 (d), os valores `1.43 t_ff` e `48% da execução` para a duração da
 > transição são NÃO CONFIRMADOS e NÃO PODEM SER CITADOS** no relatório, em figura, ou em prosa,
 > enquanto a definição operacional não for fixada e a grandeza remedida. Onde aparecem no documento,
-> aparecem com esta marcação.
+> aparecem com esta marcação. **Esta proibição PERMANECE.**
 >
-> **O que PODE ser afirmado no lugar deles, e é suficiente para o argumento que eles serviam:** a
-> duração da transição medida no ensemble é `0.7021`, `0.6188` e `0.5355 t_ff` **[M]**, as três
-> **acima** do piso `> 0.5 t_ff` da predição vigente. **A conclusão que dependia do número — a
-> transição é um processo, não um degrau — permanece verdadeira e medida.** O que não se pode
-> continuar dizendo é `48%`.
+> ~~**O que PODE ser afirmado no lugar deles:** a duração da transição medida no ensemble é `0.7021`,
+> `0.6188` e `0.5355 t_ff`.~~ **RETIRADO em 2026-08-09.** A definição foi fixada
+> (Seção 4.13.9: `duracao := t_end - t_runaway`) e sob ela esses três números **também** não são
+> citáveis: vieram de um medidor cuja definição nunca foi registrada. **Os valores citáveis passam a
+> ser `1.048`, `1.013` e `1.036 t_ff` — `34%`–`35%` da execução.** **A conclusão que dependia do
+> número — a transição é um processo, não um degrau — permanece verdadeira, agora com definição
+> fixa e com um fator `29` contra o `1.2%` da rodada 1.**
 >
 > **`t_runaway`, esse, está CONFIRMADO e resolvido:** `1.9517 t_ff` **[M]**, ver o item 1 acima.
-> A marcação de não confirmado **não** se aplica a ele.
+> A marcação de não confirmado **não** se aplica a ele. **(A BANDA `[1.2, 2.0]` em torno dele, sim,
+> foi retirada em 2026-08-09 — ver 4.13.8(5). O valor medido continua válido; o que caiu foi o
+> critério.)**
 
 ##### O que o ensemble testa, e o que ele NÃO testa
 
@@ -2691,10 +2710,16 @@ execuções compartilham **a mesma realização de Poisson da esfera**: as mesma
 densidade, a mesma estrutura de núcleo, os mesmos vizinhos próximos, o mesmo conjunto de partículas
 que termina no núcleo.
 
+> **ATUALIZAÇÃO 2026-08-09: a campanha que faltava FOI EXECUTADA. Ver a Seção 4.13.8.** O que segue
+> nesta subseção descreve corretamente o estado até `2026-08-08` e é preservado como registro da
+> ressalva e do critério de leitura pré-declarado; **a proibição de redação do final desta subseção
+> está parcialmente LEVANTADA, e a substituição está em 4.13.8.** Não citar a redação obrigatória
+> abaixo sem ler 4.13.8 antes.
+
 | eixo de variação | testado? | o que se conclui |
 |---|---|---|
 | sorteios de canal do mapa de regime (`u1`, `u2`) | **sim**, `4` sementes | o runaway não é artefato de uma sequência aleatória particular |
-| realização da condição inicial (posições) | **NÃO** | nada |
+| ~~realização da condição inicial (posições)~~ | ~~**NÃO**~~ → **SIM**, `4` realizações, 2026-08-09 | ver 4.13.8 |
 
 **Por que isto importa neste modelo especificamente, e não é uma ressalva genérica.** O runaway é um
 fenômeno de **núcleo**: a taxa de encontros escala com `n²` da densidade local, e qual corpo "sai na
@@ -2802,6 +2827,394 @@ produz então `inf - inf = NaN`. **É uma descontinuidade de guarda protegendo u
 contínuo.** **[T]** Isto **não** explica o incidente (seria determinístico), e **não** é uma
 mudança que este documento autoriza fazer agora — é um apontamento para a revisão de `resolve`, com
 a correção óbvia sendo comparar contra um piso relativo em vez de contra zero exato.
+
+#### 4.13.8 Ensemble de REALIZAÇÕES — a campanha que faltava, executada em 2026-08-09
+
+Executado 2026-08-09. **[M]** Protocolo **idêntico** ao da Seção 4.13.7 (`cold_sphere`, `N = 1000`,
+`chi = 0.1`, `Q = 0`, massas iguais, `dt = 5.0e-4`, `3 t_ff`, fp64), com os dois eixos **trocados**:
+a semente de **colisão** fixa em `config.COLLISION_SEED = 20190225`, e a de **posições** variando.
+
+| semente de posições | `N_final` | `max m / M_real` | `t_runaway / t_ff` | `\|E_int\|/\|E_0\|` |
+|---|---|---|---|---|
+| `20190222` (`config.SEED`) | `774` | `0.3213` | `1.900` | `10.833` |
+| `424242` | `767` | `0.3441` | `1.738` | `12.516` |
+| `999331` | `787` | `0.3182` | `1.820` | `9.744` |
+| `20260809` | `819` | `0.2498` | `2.199` | `5.972` |
+
+**A primeira linha é a célula compartilhada com o ensemble de 4.13.7** (posições `20190222`, colisão
+`20190225`) e reproduz `N_final`, `max m / M_real` e `|E_int|/|E_0|` **até o último dígito
+publicado**. O arnês está validado nessas três colunas. **Não está validado na quarta — ver o bloco
+de calibração adiante, que é a primeira coisa a ler antes de citar qualquer `t_runaway` desta tabela.**
+
+##### (1) O que AGORA pode ser afirmado, e o que continua não podendo
+
+**O runaway ocorre nas quatro realizações**, com `max m / M_real ∈ [0.2498, 0.3441]`, isto é, as
+quatro dentro da faixa `[0.15, 0.60]` e **nenhuma abaixo de `0.05`**. A cláusula de reabertura da
+Seção 4.13.6 (*"`max m/M_real < 0.05` → o runaway não é robusto entre sementes; reabrir"*) **não é
+acionada**. O comportamento **não é bimodal** ao longo deste eixo.
+
+**A ressalva da subseção anterior está levantada, nestes termos e não em outros.** A redação
+obrigatória passa a ser:
+
+> **PERMITIDO a partir de 2026-08-09** **[M]**: *"o runaway ocorre nas quatro realizações da condição
+> inicial testadas e nas quatro sementes de colisão testadas; ao longo do eixo das realizações a
+> massa dominante final vai de `0.25` a `0.34` de `M_real`, e ao longo do eixo dos sorteios de canal,
+> de `0.29` a `0.32`"*.
+>
+> **CONTINUA PROIBIDO** — e a razão de cada um é diferente:
+>
+> 1. *"o colapso frio a `chi = 0.1` produz runaway"*, sem qualificação. São `4` realizações a **um**
+>    `N` (`1000`), **um** `chi`, **um** `Q`, **um** `dt` e **um** horizonte. O runaway é um fenômeno
+>    de núcleo e a taxa de encontros escala com `n²` da densidade de núcleo, que é função de `N`;
+>    nada aqui é uma medição em `N`. **Um canto amostrado do espaço de parâmetros não é o fenômeno.**
+> 2. *"o runaway é robusto às escolhas estocásticas do modelo"*, como afirmação única sobre os dois
+>    eixos. **O desenho é uma CRUZ, não um fatorial.** As células executadas são `(P0, C0..C3)` e
+>    `(P0..P3, C0)`: **nenhuma célula com os dois eixos variados simultaneamente foi executada**,
+>    logo a ausência de interação entre eles **nunca foi medida**. Se alguma realização fosse bimodal
+>    sob o sorteio — produzindo runaway para uns `C` e não para outros — este desenho não a veria.
+>    É uma lacuna real, e ela é barata de fechar: `3` execuções `(P3, C1..C3)`, na realização de valor
+>    mais extremo (`20260809`), decidem se `0.2498` e `2.199` são propriedades **daquela realização**
+>    ou **daquela célula**. **Não é exigida por nada que se afirme acima**, e por isso não é pedida agora.
+> 3. Qualquer afirmação sobre **relaxação, segregação de massa ou evolução secular** — o horizonte é
+>    `3 t_ff` e o eixo variado é a semente, não o tempo.
+> 4. `INV-31(C6)` — `min_i m_i / m_bar >= 1e-3` em `>= 3` de `4` — **continua NÃO REPORTADO**. Não
+>    constava do ensemble de 4.13.7 e não consta desta campanha. **Dois ensembles seguidos sem o
+>    critério; ele não pode ser dado por passado, e a repetição da omissão é o registro.**
+
+Além disso, `INV-31(C7)` continua valendo com força maior, não menor: agora há **quatro**
+`t_runaway` distintos, de modo que **toda figura tem de marcar o `t_runaway` da SUA realização**, e
+nenhuma figura pode carregar um `t_runaway` emprestado de outra.
+
+##### (2) A inferência de 4.13.7 estava certa — deduzida antes, confirmada agora
+
+**A dedução, registrada em 4.13.7 antes desta campanha existir** (observação 2 daquela subseção): o
+`CV ≈ 4%` entre sementes de **colisão** era pequeno demais para um processo de crescimento
+descontrolado com `~3300` eventos aleatórios cada; a leitura proposta foi que *"o valor final é
+fixado pela massa disponível na vizinhança do corpo em crescimento — que é uma propriedade da
+realização de POSIÇÕES, e essa foi mantida fixa nas quatro execuções"*, marcada **[A]**.
+
+**Confirmada. A marca [A] vira [M].** Dispersão medida nos dois eixos, mesmo observável, mesmo `K = 4`:
+
+| observável | eixo do **sorteio** (4.13.7) | eixo da **realização** (4.13.8) | razão de variâncias |
+|---|---|---|---|
+| `max m / M_real` | `0.3062 ± 0.0119`, `CV = 3.9%` | `0.3084 ± 0.0407`, `CV = 13.2%` | **`11.7`** |
+| `t_runaway / t_ff` | `1.968 ± 0.018`, `CV = 0.9%` | `1.914 ± 0.201`, `CV = 10.5%` | **`122`** |
+| `N_final` | `785 ± 10`, `CV = 1.3%` | `787 ± 23`, `CV = 2.9%` | `5.4` |
+| `\|E_int\|/\|E_0\|` | `9.24 ± 1.51`, `CV = 16.3%` | `9.77 ± 2.77`, `CV = 28.4%` | `3.4` |
+
+(desvio-padrão amostral; `n = 4` no eixo do sorteio contando a rerodada de `20190227`, `n = 3` para
+`t_runaway` e `|E_int|`, que a linha com `NaN` não mede.)
+
+**A confirmação não depende dessas variâncias, e é bom que não dependa** — com `3` graus de liberdade
+uma razão de variâncias é uma estimativa péssima, e as duas amostras nem são independentes, pois
+compartilham a célula `(20190222, 20190225)`. **O argumento decisivo é de um ponto só:**
+
+```
+a realizacao 20260809 deu max m / M_real = 0.2498.
+a media entre sementes de COLISAO e' 0.30617, com sd 0.01189.
+0.30617 - 0.2498  =  4.74 desvios-padrao do eixo do sorteio.                      [M]
+```
+
+**Uma única troca de realização produziu um valor a `4.7` sd da distribuição inteira do sorteio.**
+O sorteio de canal não pode produzir isso. Não é preciso teste estatístico algum, e nenhum foi usado.
+
+Atribuição de variância, sob independência e aditividade (**[A]** quanto às duas hipóteses):
+`Var_realizacao ≈ 1.516e-3` contra `Var_sorteio ≈ 1.413e-4`, isto é **`~91%` da variância de
+`max m / M_real` vem da condição inicial** e `~9%` do sorteio.
+
+**Consequência de método, que vale mais que o número.** Um ensemble que varia a semente do modelo
+mede a robustez do **modelo**; ele não mede a robustez do **resultado**, porque o resultado é fixado
+pela condição inicial. **As duas campanhas mediram coisas diferentes, e a primeira foi lida por um
+tempo como se fosse a segunda.** Qualquer ensemble futuro deste projeto varia a realização primeiro.
+
+##### (3) Uma estrutura que a campanha revelou de graça — `|E_int|` é escravo de `max m`
+
+Ordenando as quatro realizações por `max m / M_real`, `|E_int|/|E_0|` é **perfeitamente monótona,
+`4/4`** (`0.2498 → 5.972`, `0.3182 → 9.744`, `0.3213 → 10.833`, `0.3441 → 12.516`). Testando a escala
+quadrática — esperada porque cada fusão contribui com `E_grav ∝ m_i m_j` e o número de fusões
+acompanha o crescimento do corpo dominante **[A]**:
+
+| par de realizações | `(max m)²` prevê | medido | desvio |
+|---|---|---|---|
+| `0.3441 / 0.2498` | `1.90` | `2.10` | `+11%` |
+| `0.3213 / 0.2498` | `1.65` | `1.81` | `+10%` |
+| `0.3182 / 0.2498` | `1.62` | `1.63` | `+0.6%` |
+
+**Quatro pontos não estabelecem um expoente** — `2.0` a `2.5` cabem igualmente bem —, e isto fica
+**[A]**. Mas a direção é informação, e ela **justifica retroativamente a decisão de 2026-08-08** de
+rebaixar `TOL-EINT-MAG` de cota a número reportado: `|E_int|` é função crescente da massa dominante,
+e a massa dominante não tem teto (Seção 4.13.4). **Uma cota sobre `|E_int|` seria uma cota disfarçada
+sobre `max m`, e essa é justamente a grandeza que este modelo estruturalmente não limita.** A decisão
+foi tomada por outro motivo e sobreviveu a este.
+
+##### (4) `t_runaway`: DISCREPÂNCIA DE CALIBRAÇÃO na célula compartilhada — ler antes de (5)
+
+**A linha `20190222` desta campanha e a linha `20190225` de 4.13.7 são a MESMA execução.** Três
+observáveis batem até o último dígito. O quarto não:
+
+| grandeza | Seção 4.13.7 | Seção 4.13.8 | confere? |
+|---|---|---|---|
+| `N_final` | `774` | `774` | sim |
+| `max m / M_real` | `0.3213` | `0.3213` | sim |
+| `\|E_int\|/\|E_0\|` | `10.833` | `10.833` | sim |
+| **`t_runaway / t_ff`** | **`1.9517`** | **`1.900`** | **NÃO — `2.6%`, isto é `0.0517 t_ff = 217 passos`** |
+
+**RECONCILIADO em 2026-08-09, e o resultado é pior que um erro de redutor: OS DOIS REDUTORES ESTÃO
+CERTOS.** Medição decisiva, uma execução, semente `20190222`, gravando `max_i m_i / M_real` a cada
+passo **[M]**:
+
+```
+por passo:     cruza 0.10 no passo 7981   ->  1.8996 t_ff
+grade de 50:   cruza 0.10 no passo 8200   ->  1.9517 t_ff   (exatamente o publicado)
+entre os dois cruzamentos a fracao CAI a  0.0424
+travessias de 0.10 na execucao inteira:   11
+```
+
+**A grandeza cruza o limiar ONZE VEZES.** O valor publicado é a primeira travessia que uma grade de
+`50` passos enxerga; o outro é a primeira de verdade, que a grade pula porque a fração despenca de
+volta a `0.042` logo em seguida — comportamento coerente com a fragmentação `2 -> 2` partindo o corpo
+dominante, que este documento já registra como o mecanismo sem sumidouro de massa (Seção 4.13.4).
+
+**Nenhum dos dois números está errado. O que está errado é chamar de "primeiro cruzamento" uma
+grandeza que cruza onze vezes.** `INV-31(C7)` define `t_runaway` como *"o primeiro `t` com
+`max_i m_i / M_real >= 0.10`"*, e para um sinal não monótono esse valor é **função da resolução de
+amostragem, não da trajetória**. Refinar a grade só pode antecipá-lo, nunca atrasá-lo: a dependência
+é **monótona e unilateral**, e não converge para um instante distinguido — converge para o primeiro
+pico transitório, que é ruído da história de fragmentação e não o início da fase dominante. **[T]**
+
+> **COLUNA LIBERADA.** A marcação provisória sobre `t_runaway` na tabela da Seção 4.13.8 está
+> **retirada**: os números não estão contaminados, estão **subdefinidos**, e a ressalva que os
+> acompanha passa a ser a do redutor. **Toda citação tem de dizer qual grade produziu o número:**
+> `1.9517` (4.13.7) é **grade de `50` passos**; `1.900`/`1.738`/`1.820`/`2.199` (4.13.8) são
+> **por passo**. Comparar um com o outro é comparar grades, não realizações — e é exatamente o que
+> a célula compartilhada expôs.
+>
+> **O veredito de (5) é robusto a isto, e por isso não muda.** As duas grades diferem por `2.7%` numa
+> direção conhecida (a grade grossa atrasa), enquanto o excesso de `20260809` sobre o teto `2.0` é de
+> `10%` na mesma escala por passo em que `20190222` dá `1.900`. **Comparação entre grades iguais, o
+> excesso permanece.** E a banda já está retirada por três motivos anteriores a este.
+
+##### (4b) DECISÃO: `t_runaway` é APOSENTADO como instante
+
+**Ele já não era critério — a banda foi retirada em (5). A pergunta que resta é se vale ter definição
+melhor, e a resposta é não.** Quatro razões:
+
+1. **Toda definição por travessia herda o defeito.** O sinal não é monótono e cruza `11` vezes;
+   primeira travessia, última travessia e "primeira acima de uma grade" são três números diferentes
+   da mesma trajetória, e a escolha entre eles não é decidível por medição.
+2. **A correção convencional introduz um parâmetro livre escolhido depois de ver os dados.** Exigir
+   permanência acima do limiar por uma janela `Δ` torna a grandeza insensível à amostragem — e faz
+   `Δ` selecionar qual das `11` travessias vale. **Escolher `Δ` depois de conhecer as travessias é o
+   ajuste post-hoc que este documento proíbe**, e seria a **quarta** iteração da mesma família de
+   defeito (duração da transição, `1.55`, primeira travessia, agora `Δ`).
+3. **Nada depende dele.** Não é critério, não entra em predição, e a única obrigação que carregava —
+   `INV-31(C7)`, marcar em figura o instante além do qual `V_CHAR`, `L_SCALE` e `eps` deixam de
+   descrever o sistema — **não precisa de um instante nítido; precisa de uma cota conservadora.**
+4. **Ele contaminava outra grandeza, e essa contaminação é retratada abaixo** (Seção 4.13.9).
+
+**O que fica no lugar, e é regra, não medição nova.** Para cumprir `INV-31(C7)`:
+
+```
+marcador_conservador := primeira travessia de 0.10 medida POR PASSO                     [M]
+```
+
+**Renomeado de propósito.** Não é "o instante do runaway": é uma **cota superior conservadora do
+início da fase dominante**, unilateral por construção (refinar a grade só o antecipa), a ser reportada
+**sempre com a grade declarada** e **proibida como entrada de qualquer outra grandeza**. Para
+`20190222` vale `1.8996 t_ff`. Marcar cedo demais é o erro seguro; marcar tarde é o erro que `(C7)`
+existe para impedir.
+
+**A definição que seria certa, especificada e NÃO medida.** O defeito é que se escolheu um *instante
+de travessia* de um sinal flutuante. A grandeza robusta é uma **medida de ocupação**:
+
+```
+T_above := | { t in [0, 3 t_ff] : max_i m_i / M_real (t) >= 0.10 } | / (3 t_ff)
+```
+
+Ela é **insensível à resolução em primeira ordem**: é a soma de Riemann de uma indicadora, cujo erro
+é limitado por `n_travessias * Δt_grade` e não pela localização de travessia alguma — com `11`
+travessias, `≤ 4.4%` na grade de `50` e `≤ 0.09%` por passo **[T]**. É exatamente a propriedade que
+faltou às duas definições anteriores, e é **derivada, não ajustada**. Além disso responde melhor à
+pergunta que a duração servia: *"durante que fração da execução o corpo dominante detém `>= 10%` da
+massa"* não se importa que a fração oscile.
+
+> **Não é pedida agora, e o motivo é pragmático.** Ela **não exige reexecutar nada** — é
+> `mean(f >= 0.10)` sobre o traço por passo que a reconciliação acima já gravou. Se esse traço ainda
+> existir, é uma linha; se não existir, **não vale reabrir**, porque nada do que se afirma hoje
+> depende dela. Registrada aqui para que a próxima pessoa não reinvente a terceira definição ruim.
+
+##### (5) VEREDITO sobre a linha `t_runaway ∈ [1.2, 2.0] t_ff`
+
+**A predição NÃO está refutada nesta linha — porque ela nunca foi registrada sobre este regime.
+E o preço disso é que NADA nesta campanha a confirma tampouco.**
+
+O cabeçalho da predição vigente, na Seção 4.13.6, é literal e foi escrito antes de qualquer uma
+destas execuções existir:
+
+> *"Predição (`chi = 0.1`, massas iguais, `Q = 0`, `dt = 5.0e-4`, `3 t_ff`, **semente de posições
+> fixa, variando apenas a semente de colisão**)"*
+
+A Seção 4.13.7 reforçou a mesma restrição de escopo, também antes desta campanha, ao **proibir**
+escrever *"o runaway é robusto entre realizações"*. O escopo está pré-registrado, em dois lugares,
+por escrito.
+
+**O teste que separa uma restrição de escopo legítima de uma desculpa post-hoc é se ela custa alguma
+coisa. Esta custa, e custa caro:**
+
+| linha da predição de 4.13.6 | medido em 4.13.8 | estatuto |
+|---|---|---|
+| `N_final ∈ [700, 900]` | `774`, `767`, `787`, `819` | **NÃO é confirmação** — fora do escopo registrado |
+| `max m/M_real ∈ [0.15, 0.60]` | `0.3213`, `0.3441`, `0.3182`, `0.2498` | **NÃO é confirmação** — fora do escopo registrado |
+| `max_t \|E_int\|/\|E_0\| ∈ [3, 40]` | `10.833`, `12.516`, `9.744`, `5.972` | **NÃO é confirmação** — fora do escopo registrado |
+| `t_50 > 3 t_ff` | `N_live` nunca abaixo de `767` | **NÃO é confirmação** — fora do escopo registrado |
+| `t_runaway ∈ [1.2, 2.0] t_ff` | `2.199` (`≈ 2.25` reconciliado) numa de quatro | **não refuta** — mesmo motivo, mesma direção |
+
+**Ou o escopo vale para todas as linhas, ou não vale para nenhuma.** Uma restrição de escopo que
+absolve a linha que falha e preserva as quatro que passam não é restrição de escopo; é seleção. Este
+documento adota a leitura simétrica: **as quatro realizações são evidência NOVA, num regime NOVO, e a
+predição de 4.13.6 permanece exatamente onde estava — confirmada `4/4` sobre sementes de colisão numa
+realização fixa, e sem nada a dizer sobre realizações.**
+
+**Consequência: a banda `ENS_RUNAWAY_TFF = (1.2, 2.0)` é RETIRADA, e `t_runaway` passa a grandeza
+REPORTADA.** Não alargada — **retirada**. A distinção é a que a Seção 7 já fixou para
+`TOL-EVENT-CONS`: *"mudar o tipo do critério onde a sua derivação acabou, e não o seu valor para
+caber o número observado"*. Que a derivação desta banda tinha acabado **já estava registrado antes
+desta campanha**, em 2026-08-08 (d), em três pontos independentes do número `2.199`:
+
+1. a banda foi **desenhada em torno de `1.55`**, que pertence a outra grandeza — o início da fase
+   explosiva, em `max m/M_real = 0.007`, `14x` abaixo do limiar de `0.10` que define `t_runaway`;
+2. ela passou com margens de `0.6%` a `2.4%` do teto, e o próprio documento escreveu que *"uma
+   predição que passa colada na parede é evidência mais fraca do que uma que passa no meio"*;
+3. ela é uma banda **condicionada a uma realização**, e a Seção 4.13.7 já argumentava — e (2) acima
+   agora mede — que é a realização, e não o sorteio, que fixa o desfecho. **Uma banda condicionada ao
+   fator que domina a variância tem quase nenhum conteúdo sobre o modelo.** É por isso que ela
+   sobrevive: por tecnicalidade, e a mesma tecnicalidade revela que ela media pouco.
+
+**Os três motivos são anteriores ao resultado. O `2.199` não é a razão da retirada; é a primeira
+evidência de que a banda também estava numericamente errada, além de mal derivada.**
+
+##### (6) O que fica registrado ANTES da próxima campanha, para o regime de realizações
+
+**Regra que este bloco obedece, e que limita o que ele pode fazer:** as quatro realizações
+`{20190222, 424242, 999331, 20260809}` **já foram vistas**. Nenhuma banda ajustada a elas é predição
+— é calibração. Portanto o que segue é registrado **agora**, e é falsificável **somente contra
+realizações fora desse conjunto**.
+
+**Predição registrada para o regime de realizações** (`chi = 0.1`, massas iguais, `Q = 0`,
+`dt = 5.0e-4`, `3 t_ff`, `N = 1000`, semente de colisão fixa em `COLLISION_SEED`, semente de posições
+**não pertencente ao conjunto de calibração acima**):
+
+```
+max_i m_i / M_real em 3 t_ff   in  [0.15, 0.60]                                   [A] herdada
+N_final                        in  [700, 900]                                     [A] herdada
+t_50                           >   3 t_ff                                         [A] herdada
+max_t |E_int|/|E_0|            in  [3, 40]                                        [A] herdada
+t_runaway                      in  [t_bounce , 3 t_ff]   -- e REPORTADO            [T]
+duracao da transicao           -- RETIRADA das predicoes, ver Sec. 4.13.9          --
+```
+
+**As quatro primeiras são herdadas sem alteração** do regime anterior. Herdá-las **é** a decisão
+falsificável: elas foram derivadas sob o outro eixo e nada garante que valham sob este. As quatro
+realizações já vistas cabem nelas, o que é encorajador e **não** é o teste.
+
+**A quinta é derivada, não ajustada, e por isso é fraca — e está dito.** Os dois extremos vêm do
+protocolo, não dos dados:
+
+- **piso `t_bounce`** (`≈ 1.035 t_ff` **[M]**, Seção 4.1.1): o runaway exige um corpo de `100 m_bar`,
+  logo exige o núcleo denso; **não pode preceder a formação do núcleo**. **[T]**
+- **teto `3 t_ff`**: além do fim da execução `t_runaway` não é observável, e "não ocorreu" é o
+  desfecho, não um valor.
+
+**Esta banda tem pouquíssimo conteúdo, e registrá-la mesmo assim é deliberado.** A alternativa —
+`média ± 3 sd` das quatro observações, que daria `[1.31, 2.52]` — seria mais estreita e **pior**: um
+número tirado de quatro pontos já vistos, sem derivação, exatamente a construção que produziu
+`(1.2, 2.0)` e falhou. **Uma banda larga com dois extremos derivados vale mais que uma banda estreita
+sem nenhum**, e essa é a lição do item `6` retirado do PISO (Seção 4.14): *"um item que precise de um
+argumento sobre o comportamento do sistema para se sustentar não é um piso; é uma previsão"*.
+
+**Critério de leitura da próxima campanha, também pré-registrado:**
+
+```
+alguma realizacao nova com max m/M_real < 0.05    -> bimodalidade ao longo do eixo que DOMINA
+                                                     a variancia; a Sec. 4.13.5 reabre      [A]
+alguma realizacao nova com max m/M_real > 0.60    -> degenerescencia; alavanca e' reduzir chi
+t_runaway < t_bounce em qualquer realizacao       -> defeito: o crescimento precede o nucleo,
+                                                     o que este modelo nao pode produzir     [T]
+massa ou momento inexatos                         -> defeito de implementacao (regra de 4.13.6)
+```
+
+#### 4.13.9 Duração da transição — RESOLVIDA saindo das predições, e definida para poder ser reportada
+
+**Pendência aberta em 2026-08-08 (d), decidida em 2026-08-09.** A grandeza estava numa banda
+falsificável (`> 0.5 t_ff`) **sem definição operacional**, o que o próprio documento classificou como
+defeito de especificação. Havia duas medições conflitantes da mesma trajetória, `1.43 t_ff` e
+`0.7021 t_ff`, e a proposta em aberto era `t(max m/M_real = 0.60 * valor final) - t_runaway`.
+
+**A proposta em aberto está REJEITADA, e por motivo físico, não estético.** Ela ancora o extremo
+superior no **valor final**, e o valor final é função do **horizonte de execução**: a massa dominante
+não satura em `3 t_ff` e o modelo não tem teto de massa (Seção 4.13.4). Uma "duração" definida assim
+**mudaria se a mesma trajetória fosse integrada até `4 t_ff`**. Uma grandeza cujo valor depende de
+quando o observador parou de olhar não é uma duração física. **[T]**
+
+**DECISÃO, em duas partes.**
+
+**(a) A grandeza SAI das predições falsificáveis.** `ENS_RUNAWAY_MIN_TFF = 0.5` está **retirado**.
+Motivo: não existe definição que seja simultaneamente (i) operacionalmente limpa, (ii) independente
+do horizonte e (iii) portadora de conteúdo. A definição limpa da parte (b) torna o critério
+`> 0.5 t_ff` **quase impossível de falhar** — exigiria `t_runaway > 2.5 t_ff`, e uma execução em que
+a massa dominante cruza `0.10` tão tarde e ainda assim chega a `~0.3` até `3 t_ff` não é a que o
+critério existe para excluir. **Um critério que não pode falhar não é um critério.**
+
+**(b) A grandeza GANHA definição, para poder ser REPORTADA sem ambiguidade:**
+
+```
+duracao_da_transicao  :=  t_end - t_runaway                                             [T]
+    t_runaway = primeiro t com max_i m_i / M_real >= 0.10   (INV-31(C7), ja' fixado)
+    t_end     = fim da execucao = 3 t_ff                    (constante do protocolo)
+```
+
+Ambos os extremos são definidos, e a dependência com o horizonte é **explícita na fórmula** em vez de
+escondida dentro dela. Esta é, além disso, a **única** leitura sob a qual um dos dois números
+publicados é reconstruível: `3.0 - 1.55 = 1.45 ≈ 1.43` **[T]** — o `1.43` sempre foi esta grandeza,
+medida a partir do instante errado.
+
+~~**Valores sob a definição fixada** — aritmética sobre `t_runaway` já medido:~~
+~~`20190225`: `1.048 t_ff` (`35%`); `20190226`: `1.013`; `20190228`: `1.036`.~~
+
+> # RETRATAÇÃO NO MESMO DIA — os valores acima estão RETIRADOS, e o erro é desta revisão
+>
+> **`1.048`, `1.013` e `1.036 t_ff` NÃO PODEM SER CITADOS.** Eles foram calculados de
+> `t_end - t_runaway` horas antes de a Seção 4.13.8(4) reconciliar `t_runaway` e descobrir que a
+> **grandeza cruza o limiar `11` vezes**, de modo que o valor depende da grade de amostragem e não da
+> trajetória. **Uma definição limpa ancorada numa grandeza subdefinida continua subdefinida.**
+> Os três números vieram da grade de `50` passos; por passo dariam `1.100` para `20190222`, `5%`
+> diferente, e a diferença é a grade.
+>
+> **Este é o quarto membro da mesma família, e o primeiro cometido por esta revisão.** A parte (a) —
+> a grandeza **sai das predições** — permanece válida e é o que impede o dano: ela já não é critério
+> de nada. A parte (b) fixou o extremo errado do intervalo. Corrigir o extremo `t_end` não bastava
+> porque o defeito estava no outro.
+>
+> **Estado das citações sobre duração da transição, consolidado:**
+>
+> | valor | estatuto |
+> |---|---|
+> | `1.43 t_ff` / `48%` | **PROIBIDO** — medido desde `1.55`, que é outra grandeza |
+> | `0.7021` / `0.6188` / `0.5355 t_ff` | **PROIBIDO** — medidor sem definição registrada |
+> | `1.048` / `1.013` / `1.036 t_ff` / `35%` | **PROIBIDO** — herdam a subdefinição de `t_runaway` |
+> | *nenhum número* | **é o estado correto hoje** |
+>
+> **A conclusão que os números serviam sobrevive sem eles, e é preciso ver por quê.** O argumento de
+> 4.13.5 é *"a transição lê como processo e não como glitch"*, em contraste com `1.2%` da rodada 1.
+> O que o sustenta **não é nenhuma duração**: é que `max m / M_real` **cruza `0.10` onze vezes ao
+> longo da execução** e termina em `0.25`–`0.34` **[M]** — um corpo que sobe, é partido pela
+> fragmentação, volta a subir, repetidamente, ao longo de boa parte do horizonte. **Um degrau cruza
+> uma vez.** Essa frase é qualitativa, é medida, e não depende de definição alguma que este documento
+> ainda não tenha.
+>
+> **O número que a tornaria quantitativa é `T_above`** (Seção 4.13.8(4b)), insensível à amostragem
+> por construção e obtenível por uma linha sobre um traço já gravado. **Enquanto não existir, a
+> afirmação fica qualitativa — e é preferível a um quarto número errado.**
 
 ### 4.14 O PISO — os oito pontos sem liberdade
 
@@ -3559,6 +3972,11 @@ vigente ao fim desta lista.** Enunciado original, preservado como história: `N_
 > > limpas medem `1.95`–`1.99`, encostadas no teto. **A banda não é reaberta aqui** — ela passou, e
 > > reabri-la depois de ver o resultado é precisamente o que este documento proíbe. Fica **registrado**
 > > que a sua origem é defeituosa e que a margem é de `0.6%` a `2.4%`.
+> >
+> > **ATUALIZAÇÃO 2026-08-09:** este registro é um dos três motivos — **todos anteriores ao resultado
+> > que a excedeu** — pelos quais a banda foi depois **RETIRADA**, e não alargada, na Seção 4.13.8(5).
+> > Retirar é mudar o **tipo** do critério onde a derivação acabou; alargar seria mudar o **valor**
+> > para caber o número observado. Só o primeiro é permitido, e é o que foi feito.
 >
 > A predição de campo médio que esta cláusula mandava confrontar (`~0.005`, `20x` abaixo do limiar)
 > está **refutada por fator `64`**, e a Seção 4.12 registra por quê. **(C7) deixa de ser um critério
@@ -3600,6 +4018,34 @@ Todas as tolerâncias abaixo são **relativas e adimensionais**, conforme a regr
 
 `eps_prec ∈ {eps_fp64 = 2.220446e-16, eps_fp32 = 1.1920929e-07}`, como em `integradores.md`.
 
+### 7.1 REGRA — definição operacional inclui a amostragem
+
+**Registrada em 2026-08-09, depois do quarto caso da mesma família.** Quatro grandezas deste
+documento sofreram do mesmo defeito, e nenhuma delas foi pega por um teste: todas apareceram quando
+alguém **comparou dois números que deveriam ser o mesmo**.
+
+| grandeza | definida em prosa como | o que variava sem ser dito |
+|---|---|---|
+| duração da transição | "duração da transição" | o instante inicial (`1.55` × `t_runaway`) |
+| `t_runaway ≈ 1.55` | "primeiro `t` com `max m/M_real >= 0.10`" | a grandeza medida era outra (`0.007`) |
+| `t_runaway` (`1.9517` × `1.900`) | idem | a **grade de amostragem**, sobre um sinal que cruza `11` vezes |
+| duração `= t_end - t_runaway` | fórmula limpa | herdou a subdefinição do extremo |
+
+> **REGRA NORMATIVA.** Uma grandeza que entre em predição falsificável, em critério de aceitação ou
+> em prosa publicada precisa de definição operacional que fixe **três** coisas, não uma:
+>
+> 1. **a expressão** — quais quantidades, avaliadas onde;
+> 2. **a grade de amostragem** — por passo, por saída, ou interpolada, dito explicitamente;
+> 3. **a sensibilidade a (2)** — se refinar a grade muda o valor, em que direção e por quanto.
+>
+> **Se o item (3) não for limitado, a grandeza não é publicável e não entra em predição.** Uma
+> grandeza cujo valor é função da resolução com que se olhou para ela mede o observador.
+>
+> **Preferência de projeto, derivada dos quatro casos:** onde houver escolha, prefira **medidas de
+> ocupação** (fração do tempo em que uma condição vale) a **instantes de travessia**. A primeira é
+> uma soma de Riemann e converge com erro limitado por `n_travessias × Δt`; a segunda não converge
+> para nada quando o sinal é não monótono. `T_above` (Seção 4.13.8(4b)) é o exemplo construído.
+
 **Notas normativas.**
 
 - **`TOL-EVENT-PRED` não existe em fp32 deliberadamente.** A concordância de `1e-15` entre `ΔK` e
@@ -3631,9 +4077,27 @@ Todas as tolerâncias abaixo são **relativas e adimensionais**, conforme a regr
   acabou, e não o seu valor para caber o número observado.**
 - **O que fica em aberto, e é medição, não redação.** A forma escala-invariante da cota por evento —
   `|Δ(K+U+E_int)| / E_grav(m_i,m_j,d_ij) <= 5e-2` — é derivável do `1.2%` já medido, mas **não foi
-  medida no regime pós-runaway** e está **[A]**. A medição que a converte em **[M]** é barata: um
-  histograma dessa razão sobre os `3280` eventos da execução da Seção 4.13.4. **Até que ela exista,
-  nenhum teste pode ser escrito contra `TOL-EVENT-CONS` numa execução que atravesse `t_runaway`.**
+  medida no regime pós-runaway** e está **[A]**. A medição que a converte em **[M]** é o histograma
+  dessa razão sobre os `3280` eventos da execução da Seção 4.13.4. **Até que ela exista, nenhum teste
+  pode ser escrito contra `TOL-EVENT-CONS` numa execução que atravesse `t_runaway`.**
+
+  > **DECISÃO 2026-08-09: NÃO MEDIR AGORA. Fica como está, e o custo declarado é o motivo.** A
+  > medição foi chamada de "barata" na revisão (d) e isso é verdade **só em tempo de máquina**
+  > (`O(N)` por evento sobre `3280` eventos com `N = 1000` são `~3e6` termos de par, mais uma
+  > execução colisional de `~80 s`). **O custo real não é esse.** O denominador `E_grav` já existe
+  > dentro de `resolve`, mas o numerador exige `Δ(K+U)` **com terceiros** — precisamente o termo
+  > `O(N)` que a revisão de 2026-08-07 **removeu de propósito** do cálculo, e cuja ausência é o que
+  > torna `E_int` uma forma fechada de par. Medi-lo obriga a instrumentar `resolve`, cuja **pureza é
+  > normativa** (Seção 9.1.1, ponto 1), para produzir um número que autoriza um teste que **ninguém
+  > está tentando escrever**.
+  >
+  > **Nada está bloqueado por essa ausência.** A declaração de escopo já faz o trabalho protetor: um
+  > teste incorreto — cota fixa em `|E_0|` aplicada além de `t_runaway` — está proibido pela própria
+  > linha da tabela, e nenhum resultado publicado depende da forma escala-invariante.
+  >
+  > **O gatilho que a torna obrigatória, registrado para não depender de memória:** no momento em que
+  > alguém quiser **testar** conservação de energia por evento numa execução que atravesse
+  > `t_runaway`. Até lá, `TOL-EVENT-CONS` vale no seu escopo declarado e o resíduo é **reportado**.
 
 ---
 
@@ -3726,10 +4190,19 @@ ENS_RUNAWAY_THRESHOLD = 0.10             # (C7) max_i m_i / M_real
 # este modelo estruturalmente nao tem (Sec. 4.13.4): a fragmentacao e 2->2 e conserva m_i+m_j,
 # logo nao ha sumidouro de massa.  Medido: max m_i = 321.26 m_bar.
 ENS_N_FINAL_PREDICTED  = (700, 900)      # [A] Sec. 4.13.6
-ENS_RUNAWAY_TFF        = (1.2, 2.0)      # [A] t_runaway / t_ff
 ENS_MAX_MASS_FRACTION  = (0.15, 0.60)    # [A] max_i m_i / M_real em 3 t_ff
-ENS_RUNAWAY_MIN_TFF    = 0.5             # [A] duracao minima da transicao
 ENS_EINT_MAG_RANGE     = (3.0, 40.0)     # [A] max_t |E_int|/|E_0|
+# ENS_RUNAWAY_TFF = (1.2, 2.0): RETIRADA em 2026-08-09 (Sec. 4.13.8(5)).  NAO alargada --
+#   retirada; t_runaway passa a NUMERO REPORTADO.  Tres motivos, todos ANTERIORES ao resultado
+#   que a excedeu: (i) desenhada em torno de 1.55, que pertence a outra grandeza; (ii) passou com
+#   margem de 0.6% a 2.4% do teto; (iii) condicionada a UMA realizacao, que e' o fator que domina
+#   a variancia (Sec. 4.13.8(2)).  Mesmo tratamento de TOL_COURANT, TOL_REJECT e TOL_EINT_MAG:
+#   muda-se o TIPO do criterio onde a derivacao acabou, nao o VALOR para caber o numero visto.
+# ENS_RUNAWAY_MIN_TFF = 0.5: RETIRADA em 2026-08-09 (Sec. 4.13.9).  A grandeza nunca teve
+#   definicao operacional; agora tem (t_end - t_runaway) e sob ela o criterio nao pode falhar.
+#   Sai das predicoes e vira numero reportado.
+ENS_RUNAWAY_FLOOR_TFF  = 1.035           # [T] piso derivado: t_runaway nao pode preceder t_bounce
+                                         #     (Sec. 4.13.8(6)).  Teto e' o fim da execucao, 3 t_ff.
 
 # --- ENSEMBLE K_SEEDS = 4 EXECUTADO em 2026-08-08 (Sec. 4.13.7).  [M]
 # Protocolo: semente de POSICOES fixa em SEED; varia so' a de colisao, COLLISION_SEED + k.
@@ -3757,19 +4230,40 @@ ENS_MAX_MASS_CV        = 0.04            # [M] dispersao entre sementes de COLIS
 #   Foi lido como t_runaway e transportado para (C7) e para a banda abaixo.  Nenhuma medicao
 #   nova foi necessaria; a propria definicao decide.
 ENS_RUNAWAY_TFF_MEASURED = (1.9517, 1.9874, 1.9636)  # [M] tres sementes limpas, Sec. 4.13.7
-# NOTA: ENS_RUNAWAY_TFF = (1.2, 2.0) foi desenhada em torno de 1.55, que pertence a outra
-#   grandeza.  A banda PASSOU (margens de 0.6% a 2.4% do teto) e NAO e' reaberta -- reabrir
-#   depois de ver o resultado e' o ajuste post-hoc que este documento proibe.  Origem
-#   defeituosa REGISTRADA.
 #
-# NAO CONFIRMADO -- duracao da transicao.  1.43 t_ff (48%) contra 0.7021 t_ff (23%) medido,
-#   para a MESMA execucao (N_final, max m e E_int batem ate' o ultimo digito).  Causa: a
-#   grandeza NUNCA foi definida operacionalmente neste documento.  1.43 ~ 3.0 - 1.55, isto e',
-#   medida desde o inicio da fase explosiva; 0.7021 mede intervalo mais estreito.  Os dois
-#   medem coisas diferentes.  PROIBIDO CITAR 1.43 ou 48% ate' a definicao ser fixada.
-#   Pode-se citar: 0.7021 / 0.6188 / 0.5355 t_ff [M], as tres acima do piso > 0.5 t_ff.
+# DURACAO DA TRANSICAO -- DEFINIDA em 2026-08-09 (Sec. 4.13.9):
+#   duracao := t_end - t_runaway , com t_end = 3 t_ff (constante do protocolo).
+#   Rejeitada a proposta antiga (0.60 * valor final): o valor final depende do HORIZONTE, logo
+#   a "duracao" mudaria se a mesma trajetoria fosse integrada ate' 4 t_ff.
+# ENS_TRANSITION_TFF_MEASURED = (1.048, 1.013, 1.036): RETRATADA no mesmo dia, 2026-08-09.
+#   Herdam a subdefinicao de t_runaway (ver abaixo).  NENHUM numero de duracao da transicao e'
+#   citavel hoje: 1.43/48% (medidos desde 1.55), 0.7021/0.6188/0.5355 (medidor sem definicao)
+#   e 1.048/1.013/1.036 (grade de 50) estao TODOS proibidos.  A afirmacao fica qualitativa.
+#   O numero que a quantificaria e' T_above (Sec. 4.13.8(4b)), insensivel a amostragem.
 #
-# NAO REPORTADO pela campanha, e INV-31(C6) exige: min_i m_i / m_bar >= 1e-3 em >= 3 de 4.
+# NAO REPORTADO por NENHUM dos dois ensembles, e INV-31(C6) exige:
+#   min_i m_i / m_bar >= 1e-3 em >= 3 de 4.  Duas campanhas seguidas sem ele.
+
+# --- ENSEMBLE DE REALIZACOES EXECUTADO em 2026-08-09 (Sec. 4.13.8).  [M]
+# Protocolo: semente de COLISAO fixa em COLLISION_SEED; varia a de POSICOES.
+#   pos_seed   N_final   max m/M_real   t_runaway/t_ff (*)   |E_int|/|E_0|
+#   20190222     774        0.3213          1.900              10.833   <- celula compartilhada
+#   424242       767        0.3441          1.738              12.516
+#   999331       787        0.3182          1.820               9.744
+#   20260809     819        0.2498          2.199               5.972
+ENS_POS_MAX_MASS_MEASURED = (0.3213, 0.3441, 0.3182, 0.2498)  # [M]
+ENS_POS_MAX_MASS_CV       = 0.132        # [M] contra 0.039 do eixo de COLISAO: variancia 11.7x.
+                                         #     ~91% da variancia de max m vem da CONDICAO INICIAL.
+                                         #     Confirma a deducao [A] de 4.13.7; marca vira [M].
+# (*) RECONCILIADA em 2026-08-09, coluna LIBERADA.  Sec. 4.13.8(4): os DOIS redutores estao
+#   certos.  max m/M_real cruza 0.10 ONZE VEZES; por passo a 1a travessia e' o passo 7981
+#   (1.8996 t_ff) e a fracao cai a 0.0424 logo depois, de modo que a grade de 50 so' enxerga a
+#   travessia do passo 8200 (1.9517).  A DEFINICAO e' que nao aguenta: "primeiro cruzamento" de
+#   um sinal nao monotono e' funcao da GRADE, nao da trajetoria.  Toda citacao declara a grade:
+#   4.13.7 = grade de 50 ; 4.13.8 = por passo.  Nao comparar numeros de grades diferentes.
+#   t_runaway APOSENTADO como instante (Sec. 4.13.8(4b)); sobra o marcador conservador por passo,
+#   unilateral, so' para a obrigacao de marcacao em figura de INV-31(C7), e PROIBIDO como
+#   entrada de qualquer outra grandeza.
 
 # medido no estagio 3 defeituoso de 2026-08-07 (Sec. 4.13.2), preservado para regressao:
 #   max m_i / m_bar = 321.4 , E_int/|E_0| = -109.8 , N_final = 744 , canais 34.5/12.9/52.7 %
@@ -3805,15 +4299,21 @@ o erro que `INV-15` existe para pegar.
 
 Listadas com justificativa.
 
-> **Estado das emendas, 2026-08-08 (d).** O texto anterior dizia "**Nenhuma foi aplicada por este
-> documento**", e isso deixou de ser verdade nesta data. Estado corrente:
+> **Estado das emendas, 2026-08-09.** O texto anterior dizia "**Nenhuma foi aplicada por este
+> documento**", e isso deixou de ser verdade em 2026-08-08 (d). Estado corrente:
 >
 > | subseção | alvo | estado |
 > |---|---|---|
-> | 9.1 / 9.1.1 / 9.1.2 | `docs/api-contract.md` | **APLICADA em 2026-08-08 (d)** |
-> | 9.2 | `docs/integradores.md` | **APLICADA em 2026-08-08 (d)** |
+> | 9.1 / 9.1.1 / 9.1.2 | `docs/api-contract.md` | **APLICADA em 2026-08-08 (d)**; `regime_probabilities` fixada em **2026-08-09** (9.1.1), fechando a divergência `#4` |
+> | 9.2 | `docs/integradores.md` | **APLICADA em 2026-08-08 (d)**; vínculo de `INV-6` com a suíte acrescentado em **2026-08-09** |
 > | 9.3 | `src/nbody/observables.py` | fechada desde antes; sem trabalho pendente |
-> | 9.4 | `docs/glossario.md` | **PENDENTE** |
+> | 9.4 | `docs/glossario.md` | **APLICADA em 2026-08-09** |
+>
+> **Uma emenda a `tests/` fica em aberto, e é a única.** `INV6_SEPARATION_REL_TOL = 1e-6` em
+> `tests/tolerances.py` é a cota que `integradores.md` **retratou** e que nunca chegou à suíte;
+> `TestINV6CircularSoftened` falha por `4.898e-6` **contra código correto**. A forma derivada que
+> deve substituí-la está escrita em `integradores.md`, na subseção *"Vínculo com a suíte"* de
+> `TOL-EPI`. Nem este documento nem aquele editam `tests/`.
 >
 > A regra de fundo não mudou: este documento continua sendo onde a emenda é **decidida e
 > justificada**, e os documentos-alvo são onde ela é **aplicada**. A lista permanece aqui depois de
@@ -3878,6 +4378,40 @@ símbolo a símbolo em 2026-08-08 (d) e a tabela abaixo corresponde ao código. 
 | `CollisionOutcome` | `@dataclass(frozen=True)` com `state: State` (após o passe, **drift completo**), `n_elastic: int`, `n_merge: int`, `n_fragment: int`, `delta_e_int: float` (fp64), `delta_l_spin: Tensor` (shape `(3,)`, fp64), `f_reject: float`, `c_coll_max: float` |
 | `resolve` | `(state, dt: float, model: CollisionModel, accepted: AcceptedPairs, generator, softening: float) -> CollisionOutcome` |
 | `collision_pass` | `(state, dt: float, model: CollisionModel, generator, softening: float) -> CollisionOutcome` — compõe `detect` + `pair_disjoint` + `resolve` e é o que `integrate` chama |
+| `regime_probabilities` | `(x: Tensor, *, elastic_weight: float = MAP_ELASTIC_WEIGHT, x_clamp: float = MAP_X_CLAMP) -> tuple[Tensor, Tensor, Tensor]` — **fixada em 2026-08-09**, ver o bloco abaixo |
+
+**`regime_probabilities` — a assinatura, fixada em 2026-08-09, e por que ela é pública.**
+Transcrita de `src/nbody/collisions.py:248` e conferida contra o corpo da função. Fecha a divergência
+`#4` da tabela de 9.1.2, que a registrava como "deve entrar; não entrou porque a assinatura não foi
+fixada". Quatro pontos normativos:
+
+1. **A ordem de retorno é `(p_fus, p_el, p_frag)`**, exatamente a ordem em que a Seção 4.7 as escreve.
+   Ela é normativa: os três tensores são do mesmo `dtype` e da mesma forma que `x`, e não há
+   embalagem em `dataclass` nem em dicionário. Trocar a ordem passa `INV-25(1)` (soma), passa
+   `INV-25(4)` (máximo em `x = 1`, porque `p_el` é o do meio nos dois casos) e **falha só `INV-25(3)`
+   e `INV-25(5)`** — que é precisamente por que essas duas cláusulas existem.
+2. **`x` é `Tensor`, não `float`.** A função é vetorizada sobre o passe inteiro e **genérica em
+   `dtype`**: computa na precisão que `x` carrega e nunca ramifica sobre ela. `INV-25` deve ser
+   exercitado nas duas precisões pela mesma chamada.
+3. **Os dois parâmetros são somente por palavra-chave e têm padrão em `config`**
+   (`MAP_ELASTIC_WEIGHT = 3.0`, `MAP_X_CLAMP = 1.0e12`). Eles existem para o **teste**, não para
+   calibração: a Seção 4.7 é explícita em que o mapa não tem parâmetro livre, e `resolve` chama
+   `regime_probabilities(x)` sem nunca passar nenhum dos dois. Um chamador de produção que os passe
+   está fora da especificação.
+4. **`INV-25` passa a ser testável sem `resolve`**, que era o motivo de fixar isto: as oito cláusulas
+   são propriedades do mapa sobre uma grade de `x`, e nenhuma delas precisa de um estado, de um passo
+   de tempo ou de um `Generator`.
+
+> **Divergência registrada junto, e NÃO corrigida (regra da Seção 1).** `INV-25(8)` exige que "quando
+> o mapa é substituído pelo controle, devolve `(1/3, 1/3, 1/3)`". **Esse controle não existe no
+> código.** `regime_probabilities` não tem caminho uniforme, e `elastic_weight` não é a alavanca que
+> o produz: a forma `(1/x, w, x)/Z` só dá `(1/3, 1/3, 1/3)` em `x = 1` **e** `w = 1`
+> simultaneamente, isto é, num único ponto da grade e não como substituição do mapa. A Seção 4.7 já
+> dizia que o controle é **substituir o mapa por uma constante**, não levar um parâmetro ao limite —
+> e nada em `collisions.py` implementa essa substituição. Consequência: **`INV-25(8)` é hoje
+> intestável contra este módulo**, e um teste escrito contra ele ou passa vazio (verificando uma
+> constante literal do próprio teste) ou falha contra código correto. Ou o controle entra em
+> `collisions.py` como função própria, ou `INV-25(8)` sai. Este documento não escolhe.
 
 **Três pontos normativos sobre `resolve`, cada um fechando uma ambiguidade:**
 
@@ -3956,7 +4490,7 @@ metade, o teste passa vazio contra uma implementação que ignore o parâmetro.
 | 1 | `integrate` devolve `tuple[State, CollisionRunStats]` quando `collision is not None` | `-> State`, sem ressalva | **mudança de contrato não registrada.** Registrada agora na tabela de 9.1. Não é defeito físico; é o único jeito de o laço devolver os acumuladores que a Seção 9.1.1 (ponto 1) exige que **ele**, e não `collisions.py`, mantenha |
 | 2 | `integrate` recusa `collision` com integrador diferente de `velocity_verlet` | não pedido em lugar nenhum | **o código é mais estrito que o documento, e está certo**: a Seção 4.5 define a colisão dentro do drift de Verlet e não define mais nada. Registrado agora como requisito |
 | 3 | `integrate` recusa `collision_rng` sem `collision` | não pedido | correto pelo mesmo princípio; registrado |
-| 4 | `collisions.regime_probabilities(x, *, elastic_weight, x_clamp)` é pública | 9.1.1 não a lista | é o mapa da Seção 4.7 exposto diretamente, e `INV-25` precisa dela para ser testável sem passar por `resolve`. **Deve entrar na tabela normativa de 9.1.1**; não entrou ainda porque a assinatura não foi fixada por este documento |
+| 4 | `collisions.regime_probabilities(x, *, elastic_weight, x_clamp)` é pública | 9.1.1 não a listava | **FECHADA em 2026-08-09.** A assinatura está fixada na tabela normativa de 9.1.1, com a ordem de retorno `(p_fus, p_el, p_frag)` e os dois parâmetros declarados como facilidades de teste. `INV-25` deixa de precisar de `resolve`. **Uma divergência NOVA saiu daí e está registrada em 9.1.1: `INV-25(8)` (controle uniforme) não tem implementação alguma** |
 | 5 | `CollisionModel.v_coh` é `field(kw_only=True)` **sem valor padrão** | 9.1.1 diz "sem sentinela; o chamador o computa" | **concorda em substância** — obrigatório e sem padrão é a leitura correta de "sem sentinela". Registrado para que ninguém "conserte" pondo um padrão |
 
 ### 9.2 `docs/integradores.md`
@@ -3971,6 +4505,7 @@ metade, o teste passa vazio contra uma implementação que ignore o parâmetro.
 | §7, `INV-3` e `INV-4` | registrar que **não se aplicam** a execuções com fusão ou fragmentação, e nomear os substitutos (`INV-23`, `INV-24`) | sem essa ressalva, um teste correto de `integradores.md` falha contra uma implementação correta com colisões |
 | §8.4 ("o que não pode ser afirmado") | acrescentar: nada sobre relaxação de dois corpos ou segregação de massa a partir de execuções com espectro de massas em `3 t_ff` — o tempo de relaxação por segregação é menor que o de relaxação geral por `~m_max/<m> = 285`, mas ainda **[A]** e não medido | com massas desiguais surge a tentação de afirmar segregação, que o horizonte não sustenta |
 | §10 | acrescentar item: as extensões estocásticas estão em `docs/simulacao-estocastica.md`; `INV-1..INV-10` permanecem em vigor com as emendas acima | rastreabilidade |
+| §7, `INV-6` / `TOL-EPI` | **acrescentada em 2026-08-09, APLICADA**: subseção *"Vínculo com a suíte"*, nomeando `INV6_SEPARATION_REL_TOL = 1e-6` como a cota **retratada** que sobreviveu em `tests/tolerances.py`, dando a forma derivada que a substitui e duas armadilhas de aplicação | a retratação estava escrita no documento e nunca chegou à suíte; `TestINV6CircularSoftened` falha por `4.898e-6` **contra código correto**, e o valor medido é exatamente o que `TOL-EPI` prevê. Uma cota fixa sobre uma grandeza `O(h²)` é uma afirmação sobre `dt`, não sobre a implementação |
 
 ### 9.3 `src/nbody/observables.py` — FECHADO
 
@@ -4450,3 +4985,66 @@ normativo; o resto dela é varredura de sobrevivências das revisões anteriores
     teria produzido um teste vermelho contra código correto, e o reflexo seguinte teria sido mexer
     no código. **Toda revisão que retrate algo é obrigada a procurar todos os lugares onde o número
     ou o nome retratado aparece**, e não apenas a corrigir onde a decisão foi tomada.
+
+### Decisões da revisão (e) — 2026-08-09, o ensemble de realizações
+
+**Esta revisão executa a medição que a revisão (d) nomeou como pendente e não roda modelo nenhum de
+novo.** Cinco itens.
+
+52. **O runaway ocorre nas quatro realizações da condição inicial; a ressalva de 4.13.7 está
+    levantada, e só ela.** `max m / M_real ∈ [0.2498, 0.3441]`, nenhuma abaixo de `0.05`, logo a
+    cláusula de reabertura não é acionada e o comportamento não é bimodal ao longo deste eixo.
+    **Continua proibido** dizer *"o colapso frio a `chi = 0.1` produz runaway"* — são quatro
+    realizações a um `N`, um `chi`, um `Q` e um horizonte — e continua proibido tratar os dois eixos
+    como um só: **o desenho é uma cruz, não um fatorial**, e a interação entre eles nunca foi medida.
+    `INV-31(C6)` segue **NÃO REPORTADO** por dois ensembles consecutivos. Seção 4.13.8(1).
+53. **A inferência de 4.13.7 estava certa: é a condição inicial, e não o sorteio, que fixa o
+    desfecho. [A] vira [M].** `CV` de `max m / M_real` passa de `3.9%` (eixo do sorteio) a `13.2%`
+    (eixo da realização), razão de variâncias `11.7`, e `~91%` da variância é atribuível à
+    realização. **O argumento decisivo é de um ponto só e não usa estatística nenhuma:** a
+    realização `20260809` produziu um valor a `4.74` desvios-padrão da distribuição inteira do
+    sorteio. Consequência de método: **um ensemble que varia a semente do modelo mede a robustez do
+    modelo, não a do resultado**, e qualquer ensemble futuro deste projeto varia a realização
+    primeiro. Seção 4.13.8(2).
+54. **A banda `t_runaway ∈ [1.2, 2.0] t_ff` é RETIRADA, não alargada, e a campanha nova NÃO a
+    refuta — porque também não a confirma.** O cabeçalho de 4.13.6 restringe a predição, por
+    escrito e antes do fato, a *"semente de posições fixa, variando apenas a semente de colisão"*.
+    **Ou o escopo vale para todas as linhas, ou não vale para nenhuma:** ele custa as quatro
+    confirmações que a campanha nova traria, e é por pagar esse preço que não é seleção. A retirada
+    apoia-se em três motivos **anteriores** ao `2.199` — origem em `1.55`, que é outra grandeza;
+    margens de `0.6%` a `2.4%`; e condicionamento ao fator que domina a variância. **O `2.199` não é
+    a razão da retirada; é a primeira evidência de que a banda também estava numericamente errada.**
+    Seção 4.13.8(5).
+55. **A duração da transição SAI das predições e GANHA definição.** `duracao := t_end - t_runaway`.
+    A proposta anterior (`0.60 ×` valor final) está rejeitada: o valor final depende do horizonte,
+    logo a "duração" mudaria se a mesma trajetória fosse integrada até `4 t_ff`. Sob a definição
+    fixada o critério `> 0.5 t_ff` não pode falhar, e **um critério que não pode falhar não é um
+    critério**. Números citáveis passam a ser `1.048`/`1.013`/`1.036 t_ff`, isto é `34%`–`35%`;
+    `1.43`/`48%` continuam proibidos e `0.7021`/`0.6188`/`0.5355` passam a proibidos também.
+    A conclusão que o número servia — a transição é processo, não degrau — sobrevive com fator `29`
+    contra a rodada 1. Seção 4.13.9.
+56. **Duas divergências novas, ambas pegas por confronto e nenhuma por execução nova.**
+    (a) `t_runaway` da célula compartilhada dá `1.900` contra `1.9517` publicado, com os outros três
+    observáveis batendo até o último dígito: **a coluna é provisória e não pode ser citada** até o
+    redutor reconciliar — e a discrepância **não salva** a linha da predição, porque na direção
+    aditiva piora para `~2.25`. (b) `INV-25(8)`, o controle uniforme, **não tem implementação
+    alguma**: a forma `(1/x, w, x)/Z` só dá `(1/3,1/3,1/3)` num ponto isolado, e a cláusula é hoje
+    intestável. Seções 4.13.8(4) e 9.1.1.
+57. **`t_runaway` é APOSENTADO como instante, e a duração da transição perde os números que esta
+    mesma revisão lhe deu.** A reconciliação mostrou que **os dois redutores estavam certos**:
+    `max m/M_real` cruza `0.10` **onze vezes**, a fração cai a `0.042` entre as duas primeiras, e
+    "primeiro cruzamento" de um sinal não monótono é função da **grade**, não da trajetória. Nenhuma
+    definição por travessia escapa disso, e a correção convencional — exigir permanência por uma
+    janela `Δ` — escolheria `Δ` **depois** de conhecer as travessias. Sobra um **marcador
+    conservador por passo**, unilateral, só para a obrigação de marcação em figura de `INV-31(C7)`,
+    e **proibido como entrada de qualquer outra grandeza**. Consequência imediata e assumida:
+    `1.048`/`1.013`/`1.036 t_ff` — publicados horas antes nesta revisão — **estão retratados**, e
+    hoje **nenhum** número de duração da transição é citável. A conclusão que eles serviam sobrevive
+    qualitativa e medida: **um degrau cruza uma vez; este cruza onze.** Seções 4.13.8(4), (4b), 4.13.9.
+58. **REGRA: definição operacional inclui a amostragem.** Quatro grandezas caíram pela mesma porta,
+    nenhuma pega por teste, todas descobertas ao comparar dois números que deveriam coincidir. Uma
+    grandeza em predição, critério ou prosa precisa fixar **expressão**, **grade de amostragem** e
+    **sensibilidade à grade** — e se a terceira não for limitada, a grandeza não é publicável.
+    Preferência derivada: **medida de ocupação em vez de instante de travessia**, porque a primeira
+    é soma de Riemann com erro limitado por `n_travessias × Δt` e a segunda não converge para nada
+    quando o sinal oscila. Seção 7.1.

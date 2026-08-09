@@ -83,8 +83,28 @@ INV5_RETURN_ERROR_RATIO_MAX = 30.0
 # fewer rounding steps, so re-using 1e-12 here is, if anything, conservative.
 INV5_L_REL_TOL = 1e-12
 
-# --- INV-6: two-body circular, softened (eps = 0.05), velocity_verlet, 2000 steps/period, 10 periods.
-INV6_SEPARATION_REL_TOL = 1e-6
+# --- INV-6: two-body circular, softened (eps = 0.05), velocity_verlet, 10 periods.
+#
+# INV6_SEPARATION_REL_TOL = 1e-6 was RETRACTED by docs/integradores.md (TOL-EPI, and the
+# subsection "Vinculo com a suite" added 2026-08-09). It never should have been a fixed number.
+# The discrete circular orbit is not a circle: velocity_verlet puts the pair on an epicycle whose
+# radial amplitude is (omega*dt)^2 / (4*gamma), so a fixed bound on that amplitude is an assertion
+# about dt, not about the code. With the same correct implementation it rejects at spp <= 4426 and
+# accepts at spp >= 4427. Measured over a factor 8 in dt, the deviation scales exactly as dt^2
+# (ratio 4.00x per refinement) with coefficient 0.4963 against the analytic 1/(4*gamma) =
+# 0.4962875 -- four digits. The test was failing against correct code.
+#
+# What replaces it is the dimensionless ratio of the measured amplitude to the predicted one,
+# which is a statement about the code and is independent of dt inside its domain of validity.
+INV6_EPS = 0.05
+# gamma = 2 - 1.5*d^2/(d^2 + eps^2) with d = CIRC_SEPARATION = 1.0 and eps = 0.05, i.e.
+# 2 - 1.5/1.0025 = 0.5037406484. Written as the document's value rather than imported from
+# nbody.config: this module states that its numbers come from docs/integradores.md, and the
+# suite is written from the specification without reading src/nbody.
+INV6_GAMMA = 0.5037406484
+INV6_EPI_RATIO_MIN = 0.99  # fp64 band of TOL-EPI
+INV6_EPI_RATIO_MAX = 1.03  # fp64 and fp32 (in fp32, only the upper bound applies)
+INV6_EPI_MAX_OMEGA_DT = 0.07  # domain of validity: spp >= 90
 
 # --- INV-7: TWOBODY_ECC (eps = 0.05) energy-amplitude table, fp64.
 INV7_SYMPLECTIC_RATIO_CENTER = 2.0

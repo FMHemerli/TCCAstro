@@ -187,6 +187,9 @@ def integrate(
     else:
         rng_c = None
     stats = CollisionRunStats() if collision is not None else None
+    first_nonfinite_step = (
+        torch.full((), -1, dtype=torch.int64, device=state.r.device) if collision is not None else None
+    )
 
     if every is not None:
         callback(0, 0.0, current)
@@ -204,6 +207,28 @@ def integrate(
                     current, backend_obj, dt, softening, a_current, collision, rng_c
                 )
                 stats.update(outcome)
+                # One run of the Sec. 4.13.7 ensemble ended with a non-finite total momentum and
+                # never reproduced: three reruns of the same seed through the same code path came
+                # back finite and identical, and accelerations/detect/pair_disjoint were each
+                # checked bit-identical over 200 repetitions. The cause is still open. Without the
+                # step index of the FIRST non-finite value there is nothing to investigate -- a
+                # NaN poisons v, then r, and by the end of a 12600-step run every downstream
+                # quantity is equally destroyed, which is what made the original occurrence
+                # uninformative. This check costs one reduction per step and turns a recurrence
+                # into a located event. It is deliberately not a silent repair: the state is
+                # already meaningless when it fires.
+                #
+                # The index is recorded on-device and read back ONCE, after the loop. The obvious
+                # spelling -- `if not torch.isfinite(current.v).all(): raise` -- forces a device
+                # sync every step and was measured at +51% on the collision step, which alone
+                # costs more than every optimization this module has received. Comparing against
+                # a device-side sentinel keeps the loop asynchronous.
+                bad_now = torch.logical_not(torch.isfinite(current.v).all())
+                first_nonfinite_step = torch.where(
+                    torch.logical_and(bad_now, first_nonfinite_step < 0),
+                    torch.full_like(first_nonfinite_step, step),
+                    first_nonfinite_step,
+                )
         elif integrator == "rk4":
             current = _step_rk4(current, backend_obj, dt, softening)
 
@@ -212,4 +237,13 @@ def integrate(
 
     if collision is None:
         return current
+
+    bad_step = int(first_nonfinite_step.item())
+    if bad_step >= 0:
+        raise FloatingPointError(
+            f"integrate(): velocity first became non-finite at step {bad_step} of {n_steps} "
+            f"(t = {bad_step * dt}), collision seed = {collision.seed}. The state returned by "
+            f"this call is meaningless. This is the located form of the unreproduced run "
+            f"recorded in docs/simulacao-estocastica.md Sec. 4.13.7 -- report the step index."
+        )
     return current, stats

@@ -9,6 +9,8 @@ thresholds, since the RK4 window [1e-13, 1e-9] and the symplectic bound are tied
 duration. N=2 keeps each force evaluation trivial, so despite the 40000-step count this stays a
 per-commit-affordable test on CPU.
 """
+import math
+
 import pytest
 import torch
 
@@ -28,7 +30,11 @@ from tolerances import (  # noqa: E402
     INV5_RETURN_ERROR_MAX_AT_1000_STEPS,
     INV5_RETURN_ERROR_RATIO_MAX,
     INV5_RETURN_ERROR_RATIO_MIN,
-    INV6_SEPARATION_REL_TOL,
+    INV6_EPI_MAX_OMEGA_DT,
+    INV6_EPI_RATIO_MAX,
+    INV6_EPI_RATIO_MIN,
+    INV6_EPS,
+    INV6_GAMMA,
     TOL_ENERGY_FP64,
 )
 
@@ -93,11 +99,34 @@ class TestINV5Kepler:
 # INV-6: two-body circular, softened (eps = 0.05).
 # =============================================================================================
 class TestINV6CircularSoftened:
-    def test_separation_stays_constant_over_ten_periods(self):
-        state = two_body_circular()
+    def test_epicyclic_amplitude_matches_the_predicted_value(self):
+        """
+        The softened circular orbit is NOT integrated as a circle: velocity_verlet places the pair
+        on an epicycle of radial amplitude (omega*dt)^2 / (4*gamma). docs/integradores.md, TOL-EPI.
+
+        Asserting a fixed bound on that amplitude, as the retracted INV6_SEPARATION_REL_TOL = 1e-6
+        did, is an assertion about dt rather than about the code: the same correct implementation
+        fails it at spp <= 4426 and passes at spp >= 4427. What is a statement about the code is
+        the ratio of measured amplitude to predicted amplitude, which is dimensionless and
+        dt-independent inside the domain of validity.
+
+        Two ways to get this wrong against correct code, both called out in the document:
+        the amplitude must be sampled EVERY step (at 40 samples per epicycle the extremum is
+        missed by ~0.3%), and it is the deviation from d, not from the discrete orbit's own radius
+        R_h > d -- t = 0 sits at the minimum of the oscillation, so the maximum deviation is twice
+        the radial eccentricity, and measuring against R_h would halve it and give ratio 0.5.
+        """
+        spp = 2000
+        n_periods = 10
         d0 = config.CIRC_SEPARATION
-        dt = config.CIRC_PERIOD / 2000
-        n_steps = 2000 * 10
+        dt = config.CIRC_PERIOD / spp
+        n_steps = spp * n_periods
+
+        omega = 2.0 * math.pi / config.CIRC_PERIOD
+        assert omega * dt <= INV6_EPI_MAX_OMEGA_DT, (
+            f"INV-6: omega*dt = {omega * dt:.4f} is outside TOL-EPI's domain of validity "
+            f"({INV6_EPI_MAX_OMEGA_DT}); the second-order prediction does not apply"
+        )
 
         max_relative_dev = [0.0]
 
@@ -107,12 +136,19 @@ class TestINV6CircularSoftened:
             if dev > max_relative_dev[0]:
                 max_relative_dev[0] = dev
 
-        integrate(state, integrator="velocity_verlet", backend=BACKEND, dt=dt, n_steps=n_steps,
-                  softening=0.05, callback=callback, callback_every=50)
+        integrate(state := two_body_circular(), integrator="velocity_verlet", backend=BACKEND,
+                  dt=dt, n_steps=n_steps, softening=INV6_EPS,
+                  callback=callback, callback_every=1)
 
-        assert max_relative_dev[0] <= INV6_SEPARATION_REL_TOL, (
-            f"INV-6: separation deviated by {max_relative_dev[0]:.3e}, "
-            f"exceeds {INV6_SEPARATION_REL_TOL:.1e}"
+        a_meas = max_relative_dev[0]
+        a_epi = (omega * dt) ** 2 / (4.0 * INV6_GAMMA)
+        f_prec = 4.0 * math.sqrt(n_steps) * 2.220446049250313e-16
+        ratio = (a_meas - f_prec) / a_epi
+
+        assert INV6_EPI_RATIO_MIN <= ratio <= INV6_EPI_RATIO_MAX, (
+            f"INV-6 / TOL-EPI: measured epicyclic amplitude {a_meas:.6e} against predicted "
+            f"{a_epi:.6e} gives ratio {ratio:.4f}, outside "
+            f"[{INV6_EPI_RATIO_MIN}, {INV6_EPI_RATIO_MAX}]"
         )
 
     def test_softened_period_differs_from_kepler_period_by_expected_amount(self):

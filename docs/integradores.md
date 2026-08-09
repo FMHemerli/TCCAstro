@@ -1357,6 +1357,66 @@ tendência monótona), e ao longo de 40 períodos o máximo por bloco de 10 per�
 `kappa = omega_circ * sqrt(4 - 3 d²/(d²+eps²)) = 1.003733 * omega_circ`. **Se `A_meas` crescer com o
 número de períodos, o simpletismo do integrador está quebrado e isso é um bug, não truncamento.**
 
+#### Vínculo com a suíte — `INV6_SEPARATION_REL_TOL = 1e-6` é a cota RETRATADA, e ainda está lá
+
+**Registrado em 2026-08-09.** A retratação acima foi escrita neste documento e **nunca chegou à
+suíte**. `tests/tolerances.py` continua definindo `INV6_SEPARATION_REL_TOL = 1e-6`, e
+`tests/test_twobody.py::TestINV6CircularSoftened::test_separation_stays_constant_over_ten_periods`
+a aplica a `spp = 2000`. O teste falha por `4.898e-6`. **Ele falha corretamente, e o código está
+certo:** `4.898e-6` é exatamente o que `TOL-EPI` prevê para esse `dt`.
+
+**Remedição independente 2026-08-09**, `velocity_verlet`, fp64, mesmo problema **[M]**:
+
+| passos/período | `omega_circ*dt` | desvio medido | desvio `/ (omega_circ*dt)²` |
+|---|---|---|---|
+| `500` | `1.2566e-02` | `7.8358e-05` | `0.4962` |
+| `1000` | `6.2832e-03` | `1.9592e-05` | `0.4963` |
+| `2000` | `3.1416e-03` | `4.8981e-06` | `0.4963` |
+| `4000` | `1.5708e-03` | `1.2245e-06` | `0.4963` |
+
+Razão `4.00×` a cada refinamento e coeficiente **constante em `0.4963` ao longo de um fator `8` em
+`dt`**. O valor analítico é `1/(4 gamma) = 0.4962875` **[T]**, com `gamma = 0.5037406484`. Concordância
+em **quatro dígitos**, e os valores absolutos reproduzem a tabela de verificação acima (`7.835794e-5`
+a `500`, `4.898113e-6` a `2000`). O desvio é o truncamento de segunda ordem do Verlet, não um defeito.
+
+**Por que a cota antiga não é apenas apertada — ela não é uma cota sobre o código.** `A_meas` é
+`O(h²)` com coeficiente fixo. Um número solto em `1e-6` é, portanto, uma afirmação sobre `dt` e não
+sobre a implementação: com o **mesmo código correto**, ela reprova a `spp <= 4426` e aprova a
+`spp >= 4427` **[T]**. Um critério que troca de veredito quando só o passo muda não mede corretude —
+mede o passo. É por isso que a substituição por `A_meas / A_epi` é **derivação, e não afrouxamento**:
+a banda `[0.99, 1.03]` é *mais* estreita que qualquer sinal de falha da tabela de poder discriminante
+abaixo, e independe de `dt` dentro do domínio de validade.
+
+**Forma que a suíte tem de adotar** (este documento não edita `tests/`; a emenda é aqui e a aplicação
+é lá). `INV6_SEPARATION_REL_TOL` **sai**; entram uma constante derivada e uma banda adimensional:
+
+```python
+# tests/tolerances.py -- substitui INV6_SEPARATION_REL_TOL, que e' a cota retratada
+INV6_EPS                = 0.05
+INV6_GAMMA              = 2.0 - 1.5 * CIRC_SEPARATION**2 / (CIRC_SEPARATION**2 + INV6_EPS**2)
+INV6_EPI_RATIO_MIN      = 0.99      # fp64, banda de TOL-EPI
+INV6_EPI_RATIO_MAX      = 1.03      # fp64 e fp32 (em fp32, so' a cota superior)
+INV6_EPI_MAX_OMEGA_DT   = 0.07      # dominio de validade: spp >= 90
+
+# no teste, com dt = CIRC_PERIOD / spp e n_steps = spp * n_periodos
+omega   = 2.0 * math.pi / config.CIRC_PERIOD          # == omega_circ, por construcao do fixture
+a_epi   = (omega * dt) ** 2 / (4.0 * INV6_GAMMA)
+f_prec  = 4.0 * math.sqrt(n_steps) * EPS_FP64
+ratio   = (a_meas - f_prec) / a_epi
+assert INV6_EPI_RATIO_MIN <= ratio <= INV6_EPI_RATIO_MAX
+```
+
+**Duas armadilhas para quem aplicar, ambas capazes de fazer o teste falhar contra código correto:**
+
+1. **`a_meas` tem de ser amostrado a cada passo.** O teste atual usa `callback_every=50`. Com
+   `spp = 2000` a epiciclo tem período `~2000` passos, de modo que `40` amostras por epiciclo perdem
+   o extremo por até `~0.3%` **[T]** — dentro da folga de `1%` da borda inferior, mas sem margem
+   para acumular com nada mais. Com `N = 2` a amostragem por passo é gratuita; use-a.
+2. **`a_meas` é o desvio máximo em relação a `d`, não em relação a `R_h`.** A órbita discreta tem
+   raio `R_h > d` e `t = 0` é o **mínimo** da oscilação (`|r|(0) = d` exatamente), logo o desvio
+   máximo vale **duas** vezes a excentricidade radial. Medir contra `R_h` daria metade do valor e um
+   `ratio` de `0.5`.
+
 **Poder discriminante sob `TOL-EPI`** — `spp = 2000`, 10 períodos, fp64, condição inicial sempre
 construída com `eps = 0.05`, variando apenas o `eps` passado ao núcleo de força **[M]**:
 

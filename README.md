@@ -29,13 +29,13 @@ Simulação de colisão em n-corpos com mil partículas de massas heterogêneas 
 - **fusão** (2 → 1): dois corpos coalescem em um único corpo de massa combinada;
 - **fragmentação** (2 → 2): o par se quebra em dois fragmentos com massas sorteadas.
 
-**O resultado**: quatro sementes de colisão sobre uma mesma realização de posições, 3 tempos de queda livre, N = 1000 corpos. Medido em 2026-08-08:
+**O resultado**: oito execuções de 3 tempos de queda livre com N = 1000 corpos — quatro variando o sorteio de colisão sobre uma realização fixa, quatro variando a realização de posições. Todas produzem o crescimento descontrolado.
 
-- **Transição para crescimento descontrolado**: entre 1,95 e 1,99 $t_{ff}$
-- **Duração da transição**: entre 0,54 e 0,70 $t_{ff}$  
-- **Corpo dominante**: 29 % a 32 % de toda a massa
-- **Corpos restantes**: aproximadamente 780 corpos vivos
+- **Corpo dominante**: 25 % a 34 % de toda a massa
+- **Corpos restantes**: entre 767 e 819 corpos vivos
 - **Conservação**: massa e momento exatos, desvio máximo 2,4×10⁻¹⁶ em 12.601 passos
+
+A realização de posições domina a dispersão do desfecho: ela responde por cerca de 91 % da variância, contra o sorteio de colisão.
 
 O crescimento não tem teto porque o modelo não tem sumidouro de massa: a fragmentação conserva a massa do par e a fusão apenas a concentra. É consequência estrutural, e é falsificável — alterar $\chi$ (raio de contato) ou a forma do mapa de regime deve produzir padrão diferente ou impedir o fenômeno.
 
@@ -45,7 +45,8 @@ A física de colisões e populações está fixada em [`docs/simulacao-estocasti
 
 ## Limitações conhecidas
 
-- As quatro execuções variam apenas a semente de colisão sobre uma mesma realização de posições. A robustez do crescimento entre realizações diferentes não foi medida.
+- Os dois eixos — sorteio de colisão e realização de posições — foram variados um de cada vez, nunca juntos, então a interação entre eles não foi medida.
+- O instante em que o crescimento começa não tem definição operacional que aguente uso: a fração de massa do corpo dominante cruza o limiar de 10 % onze vezes numa mesma execução, e o valor obtido depende da resolução com que a série é amostrada.
 - As tolerâncias de conservação por evento valem enquanto `max m/M_real < 0,10`: foram derivadas de pares de massa comparável e não se aplicam depois que um corpo dominante se forma.
 - `tests/test_twobody.py::TestINV6CircularSoftened` falha por 4,9e-6 contra tolerância de 1,0e-6. A falha é anterior à extensão de 2026.
 
