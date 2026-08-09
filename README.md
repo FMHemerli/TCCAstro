@@ -7,15 +7,21 @@
 ![NumPy](https://img.shields.io/badge/NumPy-013243?logo=numpy&logoColor=white)
 [![License: AGPL v3](https://img.shields.io/badge/License-AGPL_v3-blue.svg)](LICENSE)
 
+<table>
+<tr>
+<td width="33%"><img src="figures/collapse.gif" alt="Colapso frio" width="100%"></td>
+<td width="33%"><img src="figures/collapse_heterogeneo.gif" alt="População heterogênea" width="100%"></td>
+<td width="33%"><img src="figures/collapse_colisoes.gif" alt="Colisões" width="100%"></td>
+</tr>
+</table>
+
+Colapso frio, população heterogênea e colisões. Descritos abaixo.
+
 ## A Simulação
 
 Simulação de colisão em n-corpos com mil partículas de massas heterogêneas que colapsa sob gravidade e exibe um fenômeno emergente: um corpo cresce acumulando massa, absorvendo os demais, sem limite estrutural.
 
 **Mil corpos, massas variadas**: A distribuição segue um espectro tipo Salpeter, $dN/dm \propto m^{-2.35}$, truncado para garantir um a três corpos massudos por realização. As velocidades iniciais são maxwellianas isotrópicas, parametrizadas pela razão virial $Q = 2K/|U|$, em regime que preserva forte ligação gravitacional.
-
-![Colapso de população heterogênea, com o corpo mais massudo destacado em dourado](figures/collapse_heterogeneo.gif)
-
-Colapso de população heterogênea com razão de massa ~140×, destacando o corpo mais massudo em dourado. Atinge compressão máxima em t ≈ 1,19 $t_{ff}$, mais tardia que no colapso frio porque a velocidade inicial (razão virial $Q = 0,25$) oferece suporte contra o colapso.
 
 **Colisão como evento discreto**: Um detector de contato varrido captura encontros enquanto os corpos se aproximam. Cada colisão resolve em um de três desfechos, sorteado com probabilidades enviesadas pela violência do choque:
 
@@ -30,10 +36,6 @@ Colapso de população heterogênea com razão de massa ~140×, destacando o cor
 - **Corpo dominante**: 29 % a 32 % de toda a massa
 - **Corpos restantes**: aproximadamente 780 corpos vivos
 - **Conservação**: massa e momento exatos, desvio máximo 2,4×10⁻¹⁶ em 12.601 passos
-
-![Um corpo dominante cresce absorvendo o núcleo em tempo real](figures/collapse_colisoes.gif)
-
-Um corpo dominante emerge e cresce absorvendo o núcleo, terminando com ~29 % da massa total de 1000 partículas iniciais.
 
 O modelo não tem sumidouro de massa. A fragmentação conserva a massa do par e a fusão apenas a concentra, logo a física não fornece teto de massa para corpo algum. Esse crescimento não é defeito — é consequência estrutural do modelo, e é falsificável: alterações em $\chi$ (raio de contato) ou na forma do mapa de regime devem produzir padrão diferente ou impedir o fenômeno.
 
@@ -58,10 +60,6 @@ A investigação começou com o termo gravitacional em $x$: se o termo causava o
 A questão foi fechada por contagem: houve 226 fusões na execução, mas montar aquele corpo por fusão exclusiva exigiria uma árvore binária de 320 eventos. Logo não foi a fusão que o construiu. O que aconteceu foi **fragmentação**: ao repartir um par muito desigual (um corpo massudo colidindo com um leve), o modelo devolve dois corpos, e o maior deles é grande. Repetido muitas vezes, esse mecanismo concentra massa. 
 
 A descoberta é que o modelo não tem sumidouro de massa: a fragmentação conserva a massa do par e a fusão só concentra, portanto não existe teto de massa para valor nenhum de parâmetro nenhum. É consequência estrutural, não defeito. A previsão foi então reescrita (Seção 4.13.6 do documento) para descrever o crescimento em vez de negá-lo, e continua falsificável: alterar $\chi$ (raio de contato) ou a forma do mapa deve produzir padrão diferente ou impedir o fenômeno.
-
-![Colapso frio de uma esfera de 1000 partículas, de t = 0 até pouco depois da primeira passagem pelo centro de massa](figures/collapse.gif)
-
-Colapso frio de esfera com mil partículas sob gravidade. Atinge compressão máxima em t ≈ 1,03 $t_{ff}$ e dispersa em seguida; painel inferior acompanha o erro relativo de energia em escala logarítmica.
 
 ---
 
