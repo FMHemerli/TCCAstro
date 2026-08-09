@@ -119,15 +119,23 @@ def detect(state, dt: float, model: CollisionModel) -> CollisionCandidates:
 
         # Sec. 4.3, normative guards: (i) approaching only, dr.dv < 0 at step start; a pair
         # with dv == 0 has dr.dv == 0 exactly and is excluded by this test before the
-        # degenerate division below is ever selected. (ii) |dv|^2 == 0 -> t* = 0, guarded
-        # here unconditionally (not just on selected candidates) so the elementwise divide
-        # never produces inf/nan anywhere in the tile, selected or not.
+        # degenerate division below is ever selected. (ii) |dv|^2 == 0 -> t* = 0.
         approaching = dr_dot_dv < 0.0
         candidate_mask = upper & pair_live & approaching
 
-        no_relative_motion = dv_sq == 0.0
-        safe_dv_sq = torch.where(no_relative_motion, torch.ones_like(dv_sq), dv_sq)
-        raw_t_star = torch.where(no_relative_motion, torch.zeros_like(dv_sq), -dr_dot_dv / safe_dv_sq)
+        # No where-guard on the division: dv_sq == 0.0 iff dv == (0, 0, 0) exactly (a sum of
+        # three non-negative squares vanishes only if every term does), and IEEE754 squaring
+        # of a signed zero is always +0. At such a position dr_dot_dv is itself a sum of
+        # signed zeros (dr_c * 0.0), so it compares equal to, never less than, 0.0 -- meaning
+        # `approaching` is already False there and candidate_mask excludes it regardless of
+        # this division's result. The unguarded 0/0 = nan at that position propagates through
+        # clamp, through sep = dr + t_star*dv (nan * (+0) = nan), and into sep_sq < r_sum^2
+        # (any comparison against nan is False), so in_contact is also False there -- the
+        # position was never going to be selected by torch.nonzero(collide) either way. At
+        # every position where dv_sq != 0.0 (every real candidate) this is the same division
+        # the guarded form used to perform, bit for bit -- the guard only ever changed the
+        # value at positions that are provably never selected.
+        raw_t_star = -dr_dot_dv / dv_sq
         t_star = raw_t_star.clamp(min=0.0, max=dt)
 
         sep = dr + t_star.unsqueeze(-1) * dv

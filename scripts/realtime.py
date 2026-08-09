@@ -221,6 +221,20 @@ HUD_N_LINES = 8
 MARKER_SIZE_BASE = 4.0  # the size every marker had before the mass spectrum existed
 MARKER_SIZE_MIN = 2.0  # floor: the lightest sampled bodies (~0.28x mean) must stay visible
 MARKER_SIZE_MAX = 20.0  # ceiling: the 1-3 Salpeter-tail bodies (up to ~285x mean) must not become blobs
+
+# --collisions only. The collisional scale is ABSOLUTE: a marker's size is a function of that
+# body's own mass and nothing else, so a body that gains mass grows on screen and one that is
+# fragmented shrinks. That is the whole point of watching this mode, and a scale renormalized to
+# the current frame cannot show it -- under that scheme the heaviest body IS the maximum by
+# definition, so it sits pinned at the ceiling from the moment it takes the lead and its growth
+# reads as everything else shrinking instead.
+# The reference is the mean mass at t = 0, captured once (Viewer.mass_reference). It cannot be the
+# running mean: total mass is conserved while N falls, so the running mean climbs, and every
+# unchanged body would drift smaller for reasons having nothing to do with its own mass.
+# Ceiling sized from the measured outcome: the dominant body reaches ~321x the mean
+# (docs/simulacao-estocastica.md Sec. 4.13.7), and 321^(1/3) * MARKER_SIZE_BASE = 27.4 px.
+MARKER_SIZE_MAX_COLLISION = 34.0
+COLOR_SATURATION_RATIO = 100.0  # mass, in units of the t=0 mean, at which the ramp reaches HEAVY_COLOR
 BASE_COLOR = (0.4, 0.7, 1.0, 0.9)  # the color every marker had before the mass spectrum existed
 HEAVY_COLOR = (1.0, 0.85, 0.25, 1.0)  # ramp target at the heaviest body realized in this run
 
@@ -403,6 +417,11 @@ class Viewer:
         self.mass_min_real = float(self.state.m.min().item())
         self.mass_max_real = float(self.state.m.max().item())
         self.mass_ratio_real = self.mass_max_real / self.mass_min_real
+        # Fixed reference for the absolute collisional marker scale, captured before any event
+        # can change the mass distribution. See _mass_visuals_live for why it is not the running
+        # mean. Unused when --collisions is off.
+        self.mass_reference = float(self.state.m.detach().to(torch.float64).mean().item())
+
         self.marker_sizes, self.marker_colors = self._mass_visuals(self.state.m)
 
         # Collision resolution, OFF by default (--collisions and --chi were already read above,
@@ -497,33 +516,28 @@ class Viewer:
         frame, because merges and fragmentations change masses -- and slot occupancy -- as the run
         goes.
 
-        Size normalizes against the CURRENT frame's live mass range, not the fixed absolute range
-        MARKER_SIZE_MIN/MAX was calibrated for (that calibration targets the ~500x initial
-        Salpeter-tail ratio, docs/simulacao-estocastica.md Sec. 2.5). A merger can carry a single
-        body to ~300x the mean and still rising, and by construction that body IS the frame's
-        current maximum: reusing the fixed clamp would either saturate every already-heavy body at
-        MARKER_SIZE_MAX (the dominant body stops being visually distinct from ordinary heavy
-        bodies) or, if the clamp were widened to fit the new maximum, push the debris field toward
-        MARKER_SIZE_MIN and off the edge of visibility. Stretching [current_min, current_max] onto
-        [MARKER_SIZE_MIN, MARKER_SIZE_MAX] every frame keeps the full visible range in use at all
-        times, so a body's growth always shows relative to whatever else is alive that frame.
+        Both size and color are ABSOLUTE: they depend on the body's own mass and on the t=0 mean
+        (self.mass_reference), never on what else happens to be alive this frame. A body that
+        merges grows on screen; a body that is fragmented shrinks. Two bodies of equal mass are
+        always drawn the same, whatever else is going on.
 
-        Color reuses the same mean-relative cube-root ramp as _mass_visuals -- already
-        self-adaptive, since it renormalizes against the current max ratio on every call -- just
-        invoked on the live subset each frame instead of once on the full initial array.
+        This is deliberately not a per-frame renormalization. Stretching [current_min, current_max]
+        onto the marker range would keep the full palette in use at all times, but it makes the
+        heaviest body the frame maximum BY DEFINITION -- pinned at the ceiling from the moment it
+        takes the lead, so its growth from ~7x to ~321x the mean would render as the rest of the
+        field shrinking around a marker that never changes. The growth of the dominant body is the
+        phenomenon this mode exists to show, so it is the one thing the scale must not hide.
+
+        Cube root, so marker AREA tracks mass more nearly than diameter does. Ceiling at
+        MARKER_SIZE_MAX_COLLISION rather than MARKER_SIZE_MAX: the measured outcome needs headroom
+        the collisionless calibration was never given.
         """
-        r = np.cbrt(m_live.astype(np.float64))
-        r_min = r.min()
-        r_max = r.max()
-        span = r_max - r_min
-        t = (r - r_min) / span if span > 1e-300 else np.zeros_like(r)
-        sizes = MARKER_SIZE_MIN + t * (MARKER_SIZE_MAX - MARKER_SIZE_MIN)
-
         m64 = m_live.astype(np.float64)
-        mean = m64.mean()
-        ratio = np.cbrt(m64 / mean)
-        ratio_span = float(ratio.max() - 1.0)
-        tc = np.clip((ratio - 1.0) / ratio_span, 0.0, 1.0) if ratio_span > 1e-12 else np.zeros_like(ratio)
+        ratio = np.cbrt(m64 / self.mass_reference)
+        sizes = np.clip(ratio * MARKER_SIZE_BASE, MARKER_SIZE_MIN, MARKER_SIZE_MAX_COLLISION)
+
+        saturation = np.cbrt(COLOR_SATURATION_RATIO) - 1.0
+        tc = np.clip((ratio - 1.0) / saturation, 0.0, 1.0)
         base = np.array(BASE_COLOR, dtype=np.float64)
         heavy = np.array(HEAVY_COLOR, dtype=np.float64)
         colors = base[None, :] + tc[:, None] * (heavy - base)[None, :]
