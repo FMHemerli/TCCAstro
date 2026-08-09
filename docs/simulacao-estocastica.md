@@ -1216,6 +1216,25 @@ declarar que a sequência de eventos é uma aproximação grosseira. Nenhum test
 > `f_reject_total` do estágio 3, com `resolve()` ligado, onde o par se separa por construção e a
 > diluição desaparece.
 
+> **MEDIDO em 2026-08-09, e a ressalva acima estava certa.** `scripts/fragmentation_probe.py --cold`,
+> protocolo do estágio 3 (frio, massas iguais, `N = 1000`, `chi = 0.1`, `dt = 5.0e-4`, `3 t_ff`, com
+> `resolve()` ligado): **`f_reject_total = 6.80%`** — `229` de `3367` candidatos adiados, em `191`
+> passos, com até `7` candidatos disputando um mesmo passo e `f_reject = 0.75` no pior deles. **[M]**
+> O `[A]` está fechado, e o `0.407%` do estágio 2 era otimista por **fator `16.7`**, exatamente pelo
+> mecanismo de diluição que a ressalva previu.
+>
+> **Consequência, pela regra que esta seção já tinha escrito.** `6.80%` está **acima** da linha de
+> atenção de `0.05`. Logo, pelo texto acima — *"acima dela, o relatório deve declarar que a sequência
+> de eventos é uma aproximação grosseira"* — **essa declaração passa a ser obrigatória** em qualquer
+> relato da fase colisional. Não é reprovação: `INV-19(d)` deixou de ser bloqueante por decisão
+> anterior, e nada falha. É a obrigação de relato que a própria linha de atenção instituiu, agora
+> acionada por medição em vez de hipótese.
+>
+> Para contraste, na condição inicial do visualizador (espectro Salpeter, `Q = Q_DEFAULT`) o mesmo
+> instrumento dá `f_reject_total = 2.53%` — abaixo da linha. **A rejeição é uma propriedade do
+> colapso frio de massas iguais**, cujo núcleo é muito mais denso em contatos simultâneos:
+> `2458` passos com candidato contra `228`, e `2041` fragmentações contra `114`. **[M]**
+
 **Determinismo.** A chave de ordenação inclui `(i, j)` precisamente para desempatar `t*` idênticos
 em ponto flutuante. Sem isso, a ordem de aceitação depende da estabilidade do algoritmo de ordenação
 e o resultado deixa de ser reprodutível entre dispositivos. Normativo.
@@ -1794,6 +1813,127 @@ descrito como tal. É esta escolha, e não outra, que permite a `E_int` decresce
 Extensão opcional, **desligada por padrão**: impor `|u'| = |u| sqrt(mu/mu') sqrt(1-eta)` com
 `eta ∈ [0,1)` a fração dissipada, que então vai para `E_int`. O diagnóstico que decide se `eta > 0`
 é necessário está em `INV-23`.
+
+#### 4.9.1 Geometria da colocação e cadência dos eventos — medido em 2026-08-09
+
+> **O que motivou esta subseção.** Uma observação na tela, com `scripts/realtime.py --collisions`:
+> durante fragmentações um corpo parece surgir ao lado do corpo dominante, a uma distância que não
+> parece a de contato, e sumir alguns passos depois. A investigação descartou a renderização (o
+> visualizador filtra slots mortos por máscara `m > 0`, não interpola e não guarda rastro) e
+> descartou o pareamento guloso **como causa dominante** — ver a ressalva abaixo, que é uma
+> correção a uma versão anterior desta caixa. O que sobrou é a geometria desta seção, e ela não
+> estava documentada. Instrumentação: `scripts/fragmentation_probe.py`; dados em
+> `results/2026/fragmentation_probe.csv`.
+>
+> **Correção, registrada em vez de apagada.** Uma primeira medição deu `f_reject` **identicamente
+> zero**, com no máximo **um** candidato por passo, e eu ia registrar que a rejeição de pares não
+> ocorre. Estava errado, e o erro é de amostragem: aquela execução era `N = 600` até `1.43 t_ff` e
+> **nunca chega ao núcleo denso**. Rejeição exige três corpos em contato simultâneo, então qualquer
+> execução que pare antes do runaway reporta zero independentemente do que o modelo faça. Na
+> execução completa (`N = 1000`, `3 t_ff`) há passos com **`3` candidatos** e `f_reject` de até
+> **`0.6667`**. **[M]** A rejeição existe, é rara, e concentra-se exatamente na fase em que o
+> fenômeno de interesse acontece. O que continua verdadeiro é que ela não é a causa do que se vê na
+> tela; o que deixou de ser verdadeiro é "não acontece".
+>
+> **Nada disto fecha o `[A]` da Seção 4.5.** Aquele item pede o `f_reject_total` do **estágio 3**,
+> cujo protocolo é frio e de massas iguais; esta medição é na condição inicial do visualizador. O
+> número do protocolo da campanha sai de `scripts/collision_campaign.py`.
+>
+> Medidas nas **duas** condições iniciais, `N = 1000`, `dt = DT_COLLAPSE`, `3 t_ff`:
+>
+> | | espectro Salpeter, `Q = Q_DEFAULT` (visualizador) | frio, massas iguais, `Q = 0` (campanha) |
+> |---|---|---|
+> | eventos de fragmentação | `114` | `2041` |
+> | razão de massa incidente, máxima | `731:1` | `949:1` |
+> | colocação `> ` contato anterior | `66%`, mediana `1.026`, máx `1.408` | `41%`, mediana `0.995`, máx `1.441` |
+> | `\|u'\|/\|u\| < 1` | `66%`, mínimo `0.0847` | `41%`, mínimo `0.0649` |
+> | `T_cm < E_bind` do alvo | `75%`, mínimo `1.15e-3` | `48%`, mínimo `9.13e-4` |
+>
+> Os efeitos aparecem nas duas; a **fração** é menor no colapso frio porque ali todos os corpos
+> começam iguais e a maior parte dos eventos ocorre cedo, com `q ≈ 1`, onde a geometria é benigna.
+> **Ler a fração isoladamente inverte a conclusão:** em contagem absoluta o colapso frio tem `837`
+> eventos colocados além do contato anterior contra `75` do visualizador — **`11` vezes mais**. Os
+> números citados no corpo do texto abaixo são os do visualizador, que é onde a observação foi feita.
+
+**A colocação afasta os fragmentos mais do que os corpos colidentes estavam.** Como `R ∝ m^(1/3)`
+é **côncava**, partir um par desigual perto da metade dá `R_a + R_b > R_i + R_j ≥ d_ij`. Em forma
+fechada, na razão de massa incidente `q = m_maior/m_menor` e no corte `f`:
+
+```
+(R_a + R_b) / (R_i + R_j) = [f^(1/3) + (1-f)^(1/3)] / [(q/(1+q))^(1/3) + (1/(1+q))^(1/3)]
+```
+
+com teto `2^(2/3) = 1.5874` quando `q -> inf`, `f -> 1/2`. **[T]** Medido: mediana `1.026`, `p90`
+`1.346`, máximo `1.408`, e **`66%` dos eventos colocam os fragmentos mais longe do que o par
+esteve**. **[M]** A forma fechada concorda com a medição a `4.44e-16` — dois epsilons de máquina —
+no pior dos `114` eventos, o que a torna uma identidade da implementação e não um ajuste.
+
+A Seção 4.9 já observava que "nem `m_a m_b <= m_i m_j` nem `R_a+R_b >= R_i+R_j` valem
+universalmente", mas **só como ressalva sobre o sinal do incremento de `E_int`**. A consequência
+geométrica — que a regra teleporta os fragmentos para mais longe do que os corpos jamais estiveram —
+não estava enunciada.
+
+**A separação é mais lenta que o impacto, e isso não estava analisado.** `u' = |u| sqrt(mu/mu')`
+conserva `T_cm` exatamente, o que para um par desigual partido perto da metade dá:
+
+```
+|u'| / |u| = sqrt( [q/(1+q)²] / [f(1-f)] )
+```
+
+Medido: mediana `0.8896`, mínimo **`0.0848`**. **[M]** A justificativa da colocação na Seção 4.9
+apoia-se inteiramente no **sinal** de `u'` ("os fragmentos saem afastando-se"). **A magnitude nunca
+foi analisada em lugar nenhum deste documento**, e nada verifica que ela baste para o par escapar.
+
+**A recolisão não é impedida, é adiada.** A guarda de aproximação bloqueia o par apenas enquanto ele
+se separa; assim que a gravidade mútua o retorna, `dr . dv < 0` de novo e o par — deixado exatamente
+em contato — é candidato outra vez. Medido: **`200` re-eventos no mesmo par**, intervalo mínimo `2`
+passos, mediana `8`, máximo `150`; as transições mais comuns são `frag -> elástica` (`49`),
+`elástica -> elástica` (`36`), `elástica -> fusão` (`33`) e `frag -> frag` (`33`). **[M]** A
+afirmação de que a colocação "impede recolisão imediata" continua literalmente verdadeira — nesta
+execução o menor intervalo observado é de `2` passos, nunca `1` — mas **"imediata" carrega bem menos
+do que a prosa em volta dela sugere**, e é esse ciclo, e não um defeito de desenho, que aparece na
+tela ao longo de vários `dt`.
+
+**Tensão com o item 5 do PISO, declarada aqui porque não estava.** O item 5 proíbe *"**nunca**
+reposicionar corpos sobrepostos 'até se tocarem'"*, com o argumento de que afastar corpos torna `U`
+menos negativo e **injeta energia mecânica**. A fragmentação é o **único** canal que faz exatamente
+isso. A resposta do documento existe, mas está implícita e em outro lugar: o `ΔU` entra em `E_int`
+em forma fechada (Seção 4.10), de modo que a energia é **contabilizada** em vez de **evitada**.
+Nenhuma frase, até esta, dizia que o item 5 não se aplica a este canal e por quê.
+
+**Limite de escopo sobre a palavra "fragmentação".** Um levantamento de `T_cm` contra
+`E_bind = (3/5) G m²/R` do corpo maior deu `86` de `114` eventos (`75%`) com `T_cm < E_bind`,
+mediana `7.7e-2`, mínimo `1.15e-3`. **Isto não é uma violação de conservação e não deve ser lido
+como tal.** Os corpos deste modelo são **pontuais, sem estrutura interna, sem resistência e sem
+auto-ligação**; o `R` dividido acima não é raio de corpo algum, é o parâmetro de seção de choque
+`R_ref m^(1/3)`, e com `chi = 0.1` **todo contato acontece dentro do amolecimento de Plummer**, onde
+a força já não é newtoniana. O número mede a distância entre um modelo importado (esfera
+autogravitante uniforme) e um modelo que não o contém. O que ele estabelece é um **limite de
+escopo**: neste modelo "fragmentação" denota o canal de redistribuição de massa `2 -> 2` e nada
+mais, e **nenhuma afirmação sobre a disrupção de um corpo individual** — inclusive qualquer uma
+apoiada em `E_bind` ou na velocidade de escape do próprio corpo — é sustentada por ele. O limite
+vale para o README e para esta especificação, que são onde a extensão de 2026 faz suas afirmações.
+Não tem relação com o trabalho de 2019, cujo escopo declarado era comparar desempenho entre
+implementações e cujas partículas não tinham volume nem contato.
+
+**Não-localidade de `v_coh`, dita explicitamente.** Como `v_coh = V_CHAR = sqrt(G M_total/R_0)`, a
+distribuição de desfechos de um contato entre dois corpos de `1 m_bar` depende da **massa total do
+aglomerado**, do qual eles podem estar longe. O mapa é um fecho fenomenológico de escala de
+aglomerado, sem informação local ao par, e é coerente **no nível do ensemble**. O que ele não pode
+fazer é responder "este corpo se parte?", porque não contém propriedade alguma deste corpo. O
+critério tem a dimensão certa e a **localidade errada**.
+
+> **Por que nada disto muda o modelo.** A revisão de substituir `v_coh` por uma escala local ao par
+> foi levantada e **vetada**, com fundamento: `v_esc,mut² ∝ M^(2/3)` é ilimitada em massa enquanto
+> `|u|` é limitada pela dinâmica do aglomerado, logo `x -> 0` e `p_fus -> 1` — que é exatamente o
+> termo `v_esc_eff` retirado em 2026-08-07 pelo mesmo motivo. Quantificado: `216 + 1 m_bar` a
+> `u = 20 m/s` daria `x = 0.484`, `p_fus = 0.37`, `p_frag = 0.087` — o canal inverte. **[T]** E a
+> troca seria pior que lateral: o runaway atual é `2 -> 2`, conserva massa e não tem estado
+> absorvente; um runaway de fusão é `2 -> 1` **com** estado absorvente, `N` caindo monotonicamente
+> até um corpo. Qualquer porta de energia é o mesmo termo disfarçado: `T_cm > (3/5)Gm²/R` equivale a
+> `u² > (6/5)Gm²/(mu R)`, limiar crescente com a massa. **A única alavanca autorizada continua sendo
+> elevar `v_coh` constante (Seção 4.6), e ela é disparada por `INV-31(C5)` reprovar por falta de
+> fusão — não por esta análise.**
 
 **Sem piso de massa.** A fragmentação repetida pode levar massas abaixo de `m_min` indefinidamente.
 O processo **se auto-extingue** (secção de choque `∝ R² ∝ m^(2/3)`), mas não há piso declarado. A
@@ -2595,6 +2735,62 @@ rerodada reprodutível de `20190227` (`N_final = 785`, `max m = 307.6 m_bar`, is
 toda figura — **honrado**. **(C6)** — **NÃO REPORTADO**: `min_i m_i / m_bar` não consta dos números
 recebidos, e `INV-31(C6)` exige `>= 1e-3` em pelo menos `3` das `4` sementes. **É um critério do
 ensemble que ficou por verificar, e não pode ser dado por passado.**
+
+##### 4.13.7.1 Tentativa de reprodução, 2026-08-09 — `INV-31(C6)` medido, tabela por semente NÃO reproduzida
+
+A campanha acima não tinha script. `scripts/collision_campaign.py` foi escrito para dar-lhe um, e
+executado em duas configurações. O protocolo é o da Seção 4.13.6, sem desvio: esfera fria, massas
+iguais, `Q = 0`, `chi = 0.1`, `dt = DT_COLLAPSE`, `12600` passos, semente de posições fixa em
+`config.SEED`, variando só a semente de colisão.
+
+**`INV-31(C6)` — a cláusula que estava por verificar — PASSA, `4/4`, nas duas configurações.**
+`min_i m_i / m_bar` medido entre `0.0695` e `0.1477`, contra o piso de `1e-3`: no pior caso das oito
+execuções passa por **fator `70`**, não raspando. **[M]** A cláusula deixa de estar em aberto.
+
+**A tabela por semente, porém, não reproduz.** Nem na CPU nem na GPU:
+
+| semente | publicado | `cpu` / `torch_eager` | `cuda` / `torch_compiled` |
+|---|---|---|---|
+| `20190225` | `774` / `0.3213` | `781` / `0.3154` | `779` / `0.3184` |
+| `20190226` | `783` / `0.3032` | `791` / `0.2821` | `790` / `0.2163` |
+| `20190227` | `nan`, excluída | `778` / `0.3156` | `795` / `0.3053` |
+| `20190228` | `798` / `0.2926` | `803` / `0.2918` | `791` / `0.3079` |
+
+Canais agregados: publicado `27.1/6.4/66.5`; CPU `27.9/6.3/65.8`; GPU `27.3/6.5/66.2`. **[M]**
+
+**O que foi eliminado, por medição, antes de concluir.** Cada um destes foi testado, não suposto:
+
+- **Não-determinismo do código.** Dois processos separados, mesma configuração: hashes idênticos.
+- **O fatiamento em `OUT_DT`** que o script usa para amostrar a série temporal: bit a bit idêntico à
+  chamada única, em dois tamanhos de pedaço, sobre `64` eventos reais.
+- **A remoção da guarda em `detect`** (commit posterior à campanha, que alegava ser bit a bit
+  idêntica): hash idêntico numa trajetória de `6000` passos com `68` eventos. **A alegação daquele
+  commit se sustenta.**
+- **A ambiguidade em "`v_coh = V_CHAR`"** — literal arredondado (`3.2799885`) contra recálculo
+  (`3.28002489`), `1.1e-5` de diferença relativa. Hipótese testada e **refutada**: as duas dão
+  resultado **idêntico** (`781` / `0.3154` / `3138` eventos). A razão é que `v_coh` não perturba a
+  trajetória contínua; desloca `p_frag` em `1.6e-6`, e um sorteio só vira se `u1` cair a menos disso
+  de uma fronteira — cerca de `0.5%` de chance em `3138` eventos. Nenhum virou.
+
+**O que sobra, e é a conclusão.** CPU e GPU divergem entre si, e a diferença entre elas é de **ordem
+de redução** no somatório por linha do campo de força — `~1e-16` no primeiro passo. O tempo de
+Lyapunov deste problema é `~0.12 t_ff` (`tests/tolerances.py`), então `3 t_ff` são `~25` e-folds; e
+basta **um** sorteio de canal virar para as massas divergirem em `O(1)` e tudo depois seguir junto.
+**Os valores por semente desta seção são específicos do ambiente que os produziu, e esse ambiente
+— backend, dispositivo, versões — não está registrado em lugar nenhum.**
+
+**O que isso invalida e o que não invalida.** Não invalida nada do que a seção conclui: as três
+configurações concordam **distribucionalmente** (`N_final` em `774-803` contra `[700, 900]`; canais
+em `27±1 / 6.4±0.1 / 66±0.4`; runaway em todas as sementes de todas as configurações), e é sobre a
+distribuição que `INV-31` e a predição da Seção 4.13.6 são enunciadas. **Invalida a tabela por
+semente como artefato reprodutível.** Ela deve ser lida como uma realização entre muitas, não como
+número a ser reobtido — e toda campanha futura deve gravar backend, dispositivo e versões junto dos
+resultados, como `results/2026/bench_n1000.csv` já faz e esta não fez.
+
+**A execução com `nan` não recorreu.** `20190227` completou normalmente nas duas configurações
+(`778` e `795` corpos finais, sem `NaN`), consistente com as três rerodadas já registradas. A
+instrumentação de finitude (`integrators.py`) não disparou. **A causa segue em aberto**, e a
+ausência de recorrência em mais duas execuções não a fecha.
 
 **O que o resultado apoia, dito com o cuidado que ele merece.** O runaway é **robusto às escolhas
 estocásticas do modelo de colisão**: três sementes independentes (quatro, com a rerodada) produzem-no,
