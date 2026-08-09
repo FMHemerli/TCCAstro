@@ -37,29 +37,17 @@ Simulação de colisão em n-corpos com mil partículas de massas heterogêneas 
 - **Corpos restantes**: aproximadamente 780 corpos vivos
 - **Conservação**: massa e momento exatos, desvio máximo 2,4×10⁻¹⁶ em 12.601 passos
 
-O modelo não tem sumidouro de massa. A fragmentação conserva a massa do par e a fusão apenas a concentra, logo a física não fornece teto de massa para corpo algum. Esse crescimento não é defeito — é consequência estrutural do modelo, e é falsificável: alterações em $\chi$ (raio de contato) ou na forma do mapa de regime devem produzir padrão diferente ou impedir o fenômeno.
+O crescimento não tem teto porque o modelo não tem sumidouro de massa: a fragmentação conserva a massa do par e a fusão apenas a concentra. É consequência estrutural, e é falsificável — alterar $\chi$ (raio de contato) ou a forma do mapa de regime deve produzir padrão diferente ou impedir o fenômeno.
 
-O que essas quatro execuções testam é a robustez às escolhas estocásticas do modelo de colisão, não a robustez entre realizações: a condição inicial é a mesma nas quatro, e o crescimento descontrolado é um fenômeno de núcleo, cuja taxa de encontros depende das flutuações locais de densidade que a realização fixa. Variar a semente de posições continua por fazer, e a dispersão pequena entre as quatro (4 % no valor final) é indício de que é a condição inicial, e não o sorteio, que fixa o desfecho.
+## Especificação e testes
 
-## Como o Trabalho foi Feito
+A física de colisões e populações está fixada em [`docs/simulacao-estocastica.md`](docs/simulacao-estocastica.md), que define constantes, tolerâncias e invariantes; [`docs/integradores.md`](docs/integradores.md) faz o mesmo para os integradores. A suíte reúne 345 testes escritos a partir desses documentos.
 
-**Documento normativo escrito antes do código.** Antes de qualquer implementação, a Seção 4 de `docs/simulacao-estocastica.md` fixou a física: definições de colisão, regime de desfecho, algoritmo de detecção varrida, conservação exigida. Cada constante, cada tolerância, cada critério de aceitação necessários aos testes estão no documento.
+## Limitações conhecidas
 
-**Testes escritos sem ler a implementação.** A suite de testes foi redigida por agente que leu o documento normativo mas não leu o código de `src/nbody/collisions.py`. O resultado: 308 testes, 308 passando. As divergências iniciais foram todas de construção dos próprios testes, não de bugs de código. Além disso, a suite independente descobriu uma inconsistência interna do documento: uma seção exibia um invariante que outra seção já havia revogado.
-
-**Dois erros reais foram achados por medição.** 
-
-1. O parâmetro de regime $x$ deveria incluir um termo de energia gravitacional que o mantivesse baixo, regulando o crescimento. Implementação fiel ao documento o carregou e o executou. Medição mostrou: não funcionava. Pior: aumentava o crescimento em vez de contê-lo. Análise revelou que o termo nunca fora válido — a premissa sobre queda isolada de dois corpos desde o infinito não se aplica no núcleo colapsado (a densidade local é alta, e o poço de Plummer é raso). O termo foi retirado (Seção 4.6.1 do documento).
-
-2. O mapa de regime usava um softmax com dois parâmetros `(b, w)` marcados como pendentes de calibração. A calibração exigida não existia — nenhuma campanha futura a produziria. O mapa foi rescrito como a mesma forma em `w = 1, b = ln 3`, sem transcendentais, sem parâmetros a calibrar (Seção 4.7 revisada). Três operações básicas no lugar de `exp`, `log`, `log-sum-exp`.
-
-**Previsão escrita antes de medir, que falhou — e levou ao entendimento correto do modelo.** O documento previu que o corpo dominante terminaria com cerca de 3 vezes a massa média, ou 1% da massa total. Medição mostrou 321 vezes a massa média, 32% da massa total — duas ordens de grandeza acima. 
-
-A investigação começou com o termo gravitacional em $x$: se o termo causava o crescimento, retirá-lo deveria contê-lo. Retirou e rodou de novo. Falhou de novo, com a massa máxima no mesmo valor. Agora $x$ não dependia mais de massa alguma, então havia um segundo mecanismo.
-
-A questão foi fechada por contagem: houve 226 fusões na execução, mas montar aquele corpo por fusão exclusiva exigiria uma árvore binária de 320 eventos. Logo não foi a fusão que o construiu. O que aconteceu foi **fragmentação**: ao repartir um par muito desigual (um corpo massudo colidindo com um leve), o modelo devolve dois corpos, e o maior deles é grande. Repetido muitas vezes, esse mecanismo concentra massa. 
-
-A descoberta é que o modelo não tem sumidouro de massa: a fragmentação conserva a massa do par e a fusão só concentra, portanto não existe teto de massa para valor nenhum de parâmetro nenhum. É consequência estrutural, não defeito. A previsão foi então reescrita (Seção 4.13.6 do documento) para descrever o crescimento em vez de negá-lo, e continua falsificável: alterar $\chi$ (raio de contato) ou a forma do mapa deve produzir padrão diferente ou impedir o fenômeno.
+- As quatro execuções variam apenas a semente de colisão sobre uma mesma realização de posições. A robustez do crescimento entre realizações diferentes não foi medida.
+- As tolerâncias de conservação por evento valem enquanto `max m/M_real < 0,10`: foram derivadas de pares de massa comparável e não se aplicam depois que um corpo dominante se forma.
+- `tests/test_twobody.py::TestINV6CircularSoftened` falha por 4,9e-6 contra tolerância de 1,0e-6. A falha é anterior à extensão de 2026.
 
 ---
 
@@ -71,11 +59,9 @@ O trabalho de 2019 foi desenvolvido como Trabalho de Conclusão de Curso da Lice
 
 ### Nota sobre o escopo de 2019
 
-O trabalho de 2019 tinha escopo declarado: comparação de desempenho entre implementações. Por isso modelava partículas desprovidas de volume, carga ou qualquer propriedade além de massa, e corretude física não era seu objeto. Essa decisão permanece válida para a parte benchmarked do 2019 — e está registrada não como defeito, como escopo:
+O escopo declarado de 2019 era comparar desempenho entre implementações. As partículas tinham massa e nenhuma outra propriedade — sem volume, sem carga —, atraindo-se apenas pela gravidade, e a validação era a conservação de energia dentro de 5%. Corretude física não era o objeto do trabalho.
 
-> A simulação tem como objetivo demonstrar a diferença de tempo de execução entre diferentes métodos de implementação. Para isso modela-se o problema de n-corpos gravitacional com N partículas providas de massa, mas desprovidas de volume, carga ou qualquer outra propriedade física, atraindo-se exclusivamente pela força gravitacional ao longo de um número definido de iterações, e verifica-se a validade da simulação igualando a energia total do sistema à energia potencial gravitacional total do sistema no passo 0. Corretude física não é o objeto do trabalho; desempenho entre formas de implementação é. Isso não é uma limitação a desculpar, é o escopo declarado.
-
-A extensão de 2026, com colisões, muda o objeto: agora há volume (raio de contato), eventos físicos discretos e fenômeno dinâmico a descrever. As partículas deixam de ser abstratas e a física volta a ser central. É por isso que 2026 exigiu documento normativo.
+A extensão de 2026 muda o objeto: há raio de contato, eventos discretos e um fenômeno dinâmico a descrever.
 
 ---
 
@@ -193,7 +179,7 @@ Fonte: metadados de ambiente registrados em cada execução de benchmark.
 
 ### Melhoria do código
 
-Refatoração em pacote `src/nbody` instalável, substituindo notebooks duplicados. Força desacoplada da integração: cada backend expõe `accelerations(r, m)`; os integradores são agnósticos de backend. Verlet e RK4 exigem esse desacoplamento porque avaliam a força em estados que não são o estado armazenado no início do passo: o Verlet, nas posições novas dentro do passo — valor que é reaproveitado como aceleração inicial do passo seguinte, de modo que o custo permanece de uma avaliação por passo; o RK4, em quatro estágios intermediários. Redução de energia por operação tensorial, sem acumulação concorrente. Instrumentação fora da região cronometrada. [Tiling](docs/glossario.md) com teto de memória configurável: a forma vetorizada ingênua materializa um tensor N × N × 3, inviável em N grande. O cálculo opera em blocos de i. Cobertura de 211 testes automatizados (pytest), incluindo equivalência entre backends, conservação de momento linear, dois corpos contra solução analítica e medição de [ordem de convergência](docs/glossario.md) empírica.
+Refatoração em pacote `src/nbody` instalável, substituindo notebooks duplicados. Força desacoplada da integração: cada backend expõe `accelerations(r, m)`; os integradores são agnósticos de backend. Verlet e RK4 exigem esse desacoplamento porque avaliam a força em estados que não são o estado armazenado no início do passo: o Verlet, nas posições novas dentro do passo — valor que é reaproveitado como aceleração inicial do passo seguinte, de modo que o custo permanece de uma avaliação por passo; o RK4, em quatro estágios intermediários. Redução de energia por operação tensorial, sem acumulação concorrente. Instrumentação fora da região cronometrada. [Tiling](docs/glossario.md) com teto de memória configurável: a forma vetorizada ingênua materializa um tensor N × N × 3, inviável em N grande. O cálculo opera em blocos de i. Cobertura por suíte automatizada (pytest), incluindo equivalência entre backends, conservação de momento linear, dois corpos contra solução analítica e medição de [ordem de convergência](docs/glossario.md) empírica.
 
 ### Arquitetura — seis degraus
 
@@ -325,7 +311,7 @@ Dez tempos de queda livre, custo igual por unidade de tempo físico. Fonte: `res
 | Verlet de velocidades | 3,53e-5 | não |
 | RK4 | 1,06e-6 | não |
 
-O Euler explícito ultrapassa a tolerância de 5% em t/t_ff = 1,033, imediatamente antes da compressão máxima, que ocorre em 1,036 — ou seja, durante a primeira passagem pelo centro de massa. O Euler semi-implícito permanece dentro dela em todo o horizonte. A [deriva secular](docs/glossario.md) do RK4 é linear no tempo, com coeficiente 9,36e-8 por t_ff e R² = 0,997 sobre 2.953 pontos. As bandas do Verlet e do Euler semi-implícito não apresentam tendência de crescimento ao longo dos dez tempos de queda livre: a excursão grande de ambos ocorre uma única vez, no colapso em t/t_ff ≈ 1, e depois que o sistema viraliza a banda cai mais de uma ordem de grandeza e permanece estacionária pelo resto do horizonte.
+O Euler explícito ultrapassa a tolerância de 5% em t/t_ff = 1,033, imediatamente antes da compressão máxima, que ocorre em 1,036 — ou seja, durante a primeira passagem pelo centro de massa. O Euler semi-implícito permanece dentro dela em todo o horizonte. A [deriva secular](docs/glossario.md) do RK4 é linear no tempo, com coeficiente 9,36e-8 por t_ff e R² = 0,997 sobre 2.953 pontos. As bandas do Verlet e do Euler semi-implícito não apresentam tendência de crescimento ao longo dos dez tempos de queda livre: a excursão grande de ambos ocorre uma única vez, no colapso em t/t_ff ≈ 1, e depois que o sistema virializa a banda cai mais de uma ordem de grandeza e permanece estacionária pelo resto do horizonte.
 
 ### Condição inicial
 
