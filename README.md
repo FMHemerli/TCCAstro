@@ -380,9 +380,28 @@ Executar testes:
 pytest tests/
 ```
 
-Ver a simulação com colisões em tempo real:
+Visualizador em tempo real, nos três modos:
 ```bash
-python scripts/realtime.py --collisions
+python scripts/realtime.py --cold           # colapso frio, massas iguais, sem colisões
+python scripts/realtime.py                  # população heterogênea, sem colisões
+python scripts/realtime.py --collisions     # população heterogênea com colisões
+```
+
+Parâmetros da condição inicial, aceitos por ambos os modos heterogêneos:
+```bash
+python scripts/realtime.py --alpha 1.8      # expoente do espectro de massas
+python scripts/realtime.py --mass-ratio 500 # razão entre massa máxima e mínima
+python scripts/realtime.py --virial-q 0.1   # razão virial Q = 2K/|U| das velocidades
+python scripts/realtime.py --f-cut 0.5      # corte de velocidade, fração da de escape
+python scripts/realtime.py --collisions --chi 0.2  # raio de contato, em unidades do softening
+python scripts/realtime.py --n 2000 --seed 7       # contagem de corpos e semente
+```
+
+Regerar os GIFs do README, sem abrir janela:
+```bash
+python scripts/capture_collapse_gif.py --cold        # figures/collapse.gif
+python scripts/capture_collapse_gif.py               # figures/collapse_heterogeneo.gif
+python scripts/capture_collapse_gif.py --collisions  # figures/collapse_colisoes.gif
 ```
 
 Rodar as campanhas:
@@ -392,9 +411,11 @@ python scripts/bench.py               # os seis degraus em N = 1000
 python scripts/sweep_n.py             # varredura de N, ~50 min
 python scripts/integrator_study.py    # integradores a custo igual
 python scripts/longrun_energy.py      # energia ao longo de 10 t_ff
+python scripts/crossover_scaling_law.py  # lei de escala do cruzamento CPU/GPU
+python scripts/extract_legacy_results.py # extrai os resultados de 2019 dos notebooks
 ```
 
-Os resultados são gravados em `results/2026/` como CSV estruturado, com metadados de ambiente em cada linha.
+As campanhas gravam em `results/2026/` como CSV estruturado, com metadados de ambiente em cada linha. O visualizador não escreve nada em disco.
 
 ---
 
