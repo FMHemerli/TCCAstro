@@ -13,6 +13,10 @@ Simulação de colisão em n-corpos com mil partículas de massas heterogêneas 
 
 **Mil corpos, massas variadas**: A distribuição segue um espectro tipo Salpeter, $dN/dm \propto m^{-2.35}$, truncado para garantir um a três corpos massudos por realização. As velocidades iniciais são maxwellianas isotrópicas, parametrizadas pela razão virial $Q = 2K/|U|$, em regime que preserva forte ligação gravitacional.
 
+![Colapso de população heterogênea, com o corpo mais massudo destacado em dourado](figures/collapse_heterogeneo.gif)
+
+Colapso de população heterogênea com razão de massa ~140×, destacando o corpo mais massudo em dourado. Atinge compressão máxima em t ≈ 1,19 $t_{ff}$, mais tardia que no colapso frio porque a velocidade inicial (razão virial $Q = 0,25$) oferece suporte contra o colapso.
+
 **Colisão como evento discreto**: Um detector de contato varrido captura encontros enquanto os corpos se aproximam. Cada colisão resolve em um de três desfechos, sorteado com probabilidades enviesadas pela violência do choque:
 
 - **choque elástico**: conserva energia, momento e momento angular exatamente;
@@ -26,6 +30,10 @@ Simulação de colisão em n-corpos com mil partículas de massas heterogêneas 
 - **Corpo dominante**: 29 % a 32 % de toda a massa
 - **Corpos restantes**: aproximadamente 780 corpos vivos
 - **Conservação**: massa e momento exatos, desvio máximo 2,4×10⁻¹⁶ em 12.601 passos
+
+![Um corpo dominante cresce absorvendo o núcleo em tempo real](figures/collapse_colisoes.gif)
+
+Um corpo dominante emerge e cresce absorvendo o núcleo, terminando com ~29 % da massa total de 1000 partículas iniciais.
 
 O modelo não tem sumidouro de massa. A fragmentação conserva a massa do par e a fusão apenas a concentra, logo a física não fornece teto de massa para corpo algum. Esse crescimento não é defeito — é consequência estrutural do modelo, e é falsificável: alterações em $\chi$ (raio de contato) ou na forma do mapa de regime devem produzir padrão diferente ou impedir o fenômeno.
 
@@ -53,7 +61,7 @@ A descoberta é que o modelo não tem sumidouro de massa: a fragmentação conse
 
 ![Colapso frio de uma esfera de 1000 partículas, de t = 0 até pouco depois da primeira passagem pelo centro de massa](figures/collapse.gif)
 
-Colapso frio de uma esfera de N = 1000 partículas, integrado com velocity Verlet em fp32 na GPU, de t = 0 até t = 1,4 $t_{ff}$. A esfera contrai sob a própria gravidade, atinge compressão máxima na primeira passagem pelo centro de massa em t ≈ 1,03 $t_{ff}$ e volta a se dispersar. O painel inferior acompanha o erro relativo de energia |dE/E₀| em escala logarítmica, com a linha laranja marcando a tolerância de 5% adotada em 2019. O erro sobe abruptamente na passagem pelo centro, onde as separações entre pares são mínimas e a força varia mais rápido — de 4,2·10⁻⁷ em t = 0,81 $t_{ff}$ para 8,6·10⁻⁴ no cruzamento — e em seguida recua para cerca de 10⁻⁶. Essa injeção e devolução de erro em torno do cruzamento é a assinatura de um integrador simplético; o que não se vê nesta janela curta é que o erro permanece limitado em banda ao longo de dezenas de tempos de queda livre, comportamento medido e reportado na Parte 2 abaixo. Gerado por [`scripts/capture_collapse_gif.py`](scripts/capture_collapse_gif.py) a partir do visualizador em [`scripts/realtime.py`](scripts/realtime.py).
+Colapso frio de esfera com mil partículas sob gravidade. Atinge compressão máxima em t ≈ 1,03 $t_{ff}$ e dispersa em seguida; painel inferior acompanha o erro relativo de energia em escala logarítmica.
 
 ---
 
