@@ -100,15 +100,15 @@ color are recomputed every frame instead of once at construction, because masses
 merges and fragmentations, and dead slots (m == 0, left behind by a merger, carrying the
 surviving body's own position -- nbody.observables.n_live's definition of "live" is m > 0) are
 dropped before drawing so they cannot render as phantom markers on top of the body that absorbed
-them; size normalizes against the CURRENT frame's live mass range rather than the fixed range
-MARKER_SIZE_MIN/MAX was calibrated for (see _mass_visuals_live), so a body growing past the
-initial ~500x mass ratio stays visibly the largest thing on screen instead of saturating the
-cap or shrinking everything else to invisibility; (3) the energy panel plots E_int/|E0| and
-|dE_total/E0| with E_total = K + U + E_int (E_int is the cumulative collisional dissipation
-ledger, Sec. 4.10) instead of the collisionless |dE/E0| -- same panel, new label, so the two
-quantities are never mistaken for one another on screen; (4) both are labelled REPORTED, not
-watched -- see the Auto-stop paragraph above for why judging the trajectory by them is wrong in
-this mode.
+them; size and color are ABSOLUTE, anchored to the t=0 mean mass and never to the current
+frame's range (see _mass_visuals_live), so a body that merges grows on screen and one that is
+fragmented shrinks, with the ceiling raised to MARKER_SIZE_MAX_COLLISION to give the dominant
+body the headroom the collisionless calibration was never given; (3) the energy panel plots
+E_int/|E0| and |dE_total/E0| with E_total = K + U + E_int (E_int is the cumulative collisional
+dissipation ledger, Sec. 4.10) instead of the collisionless |dE/E0| -- same panel, new label,
+so the two quantities are never mistaken for one another on screen; (4) both are labelled
+REPORTED, not watched -- see the Auto-stop paragraph above for why judging the trajectory by
+them is wrong in this mode.
 
 Usage:
     python scripts/realtime.py [--n N] [--mass MASS] [--radius RADIUS] [--cold]
