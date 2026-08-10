@@ -2755,9 +2755,116 @@ termo — é o defeito que esta revisão corrige, e o seu preço medido é `8.56
 2026-08-07 (b) fica automaticamente incorporada**: com `E_int += -(ΔK + ΔU)` não há sinal a errar,
 porque a regra geral é a única forma escrita.
 
+#### O que `E_int` SIGNIFICA depois da revisão (f), e por que o seu sinal deixa de ser informativo
+
+> **Achado do dev ao implementar esta seção literalmente, e ele é mais forte do que foi relatado:
+> não é que a fusão POSSA tornar `Delta E_int` negativo em fusões próximas. É que TODA fusão o faz,
+> por identidade com o próprio portão.** Substituindo `ΔK = -T_cm` e `ΔU_par = +G m_i m_j/d~_c`:
+>
+> ```
+> E_int += -(dK + dU) = ( T_cm - G m_i m_j / d~_c )  -  dU_campo  =  E_rel  -  dU_campo
+> ```
+>
+> e `E_rel < 0` **é literalmente o portão 1** (Seção 4.6). Não há fusão com `E_rel >= 0`. Logo o
+> termo de par do incremento é **estritamente negativo em todo evento de fusão, sem exceção e sem
+> depender de escala**. O caso medido pelo dev (`m_bar`+`m_bar`, `d~_c = 0.0510`, `|u| = 2 m/s`:
+> `ΔK = -1.000e9`, `ΔU_par = +1.309e9`, `E_int += -3.089e8`) é o caso **genérico**, não um extremo.
+> **[T]**, e a aritmética foi reproduzida aqui **[M]**.
+>
+> **Cota por evento:** `|ΔE_int| <= G m_i m_j / d~_c`, que vale `2.04e-4 |E_0|` para o par
+> `m_bar`–`m_bar` e **`1.40e-1 |E_0|`** para `1000 m_bar` + `m_bar` **[T]**. Cresce com a massa e
+> não tem teto, pelo mesmo motivo que nada mais neste modelo tem.
+>
+> **Isto é uma consequência da decisão (b), e ela não existia antes.** Com o mapa estocástico,
+> `p_fus > 0` para todo `x`, de modo que a fusão às vezes disparava com `T_cm > E_grav` e o
+> incremento era positivo — o sinal era **indefinido**, e a Seção 4.10 registrava isso na retratação
+> de 2026-08-07 (b). Com o portão determinístico, a fusão dispara **se e somente se** o incremento
+> é negativo. O sinal deixou de ser indefinido: ficou **fixo, e negativo**.
+
+**A erosão também pode decrescer, e não é raro.** `ΔK = -(1-e²)T_n - E_custo < 0` sempre, mas
+`ΔU_par = G (m_G m_P - m_G' m_P')/d~_c > 0` sempre — transferir massa do menor para o maior **reduz**
+o produto `m m'`, logo o poço mútuo fica mais raso e `U` sobe. Varrendo
+`q ∈ [1,1000]`, `(u_n/|u|)² ∈ [0.01,1]`, `T_cm` de `E_esc` a `10^4 E_lig`, com a precedência da fusão
+imposta: **`11.3%` do espaço de parâmetros dá `ΔE_int < 0`**, com pior caso `-0.486 T_cm` em
+`q = 1000` e impacto rasante **[M]**.
+
+**Portanto, normativo:**
+
+```
+canal        sinal de Delta E_int
+-----------  --------------------------------------------------------------
+ricochete    > 0 SEMPRE           (1/2) mu (1-e^2) u_n^2 , unico canal com sinal garantido
+fusao        < 0 SEMPRE           = E_rel - dU_campo, e E_rel < 0 E' o portao
+erosao       INDEFINIDO           negativo em ~11% do espaco de parametros [M]
+```
+
+**O que `E_int` mede, dito com precisão.** Não é "energia absorvida pelas colisões". É **a energia
+interna dos produtos de colisão** — a única leitura compatível com a regra `E_int += -(ΔK + ΔU)` —
+e a energia interna de um objeto **ligado é negativa** em relação aos seus constituintes dispersos.
+`E_int` decompõe-se em duas parcelas que este modelo **não separa**:
+
+- **calor**, positivo: `(1/2) mu (1-e²) u_n²` no ricochete, `E_custo` na erosão;
+- **ligação armazenada**, negativa: o poço mútuo `-G m_i m_j/d~_c` que desaparece de `U` quando o par
+  vira um corpo pontual, e que um modelo com estrutura interna reteria como auto-energia.
+
+A leitura do coordenador está **correta e é a que fica**: a ligação gravitacional mútua deveria ser
+retida como energia interna do corpo fundido; o modelo não tem termo de auto-energia para um ponto
+material; o poço evapora de `U`; a contabilidade fecha e `E_int` absorve. **O balanço está certo; o
+nome estava errado.**
+
+**Consequências normativas, todas obrigatórias:**
+
+1. **O sinal de `E_int` não é diagnóstico de nada.** `E_int < 0` não denuncia sinal trocado, termo
+   esquecido nem injeção espúria. Nenhum teste pode fixar o sinal. A Seção 4.10 já dizia
+   *"`E_int(t)` pode legitimamente ficar negativa, e o sinal deixou de ser um critério"*; a revisão
+   (f) endurece isso de "pode" para "vai, e por identidade".
+2. **`E_int` decrescente monotonamente durante o runaway é a PREDIÇÃO, não o sintoma.** Com fusões
+   cada vez mais massivas, `Σ |E_rel|` cresce e `E_int(t)` desce. Uma curva de `E_int` que **sobe**
+   num regime dominado por fusão é que merece investigação.
+3. **Reportar `E_int` RESOLVIDA POR CANAL.** `E_int_ricochete`, `E_int_fusao`, `E_int_erosao`, as
+   três somadas ao longo do tempo, no CSV e no HUD. Com o sinal fixo por canal, a decomposição é o
+   que resta de poder diagnóstico: a curva de ricochete tem de ser monótona crescente, a de fusão
+   monótona decrescente, e um desvio disso **é** um bug. Isto substitui o sinal do agregado como
+   diagnóstico, e é estritamente mais forte do que ele jamais foi.
+4. **Reportar `min_evento ΔE_int` e `max_evento ΔE_int`**, com o canal e a razão de massa do evento
+   que os produziu.
+5. **Proibição de prosa.** É proibido descrever `E_int` como "energia dissipada", "calor" ou
+   "orçamento de dissipação" — três formulações que este documento usou. A forma permitida é
+   **"energia interna dos produtos de colisão (calor mais ligação armazenada, sem separação entre
+   as duas)"**. A Seção 4.11 `(D2)`, que chama `E_int(t)/|E_0|` de *"o orçamento de dissipação"*,
+   fica emendada por esta cláusula.
+
+#### Veto: NÃO acrescentar termo de auto-energia à fusão
+
+A alternativa considerada — introduzir `E_self(m) = -K_BIND G m²/R(m)` no orçamento conservado, de
+modo que `E_int` voltasse a medir só calor — está **REJEITADA**. Ela funciona algebricamente
+(`ΔU_self = -9.409e9 J` para a fusão `m_bar`+`m_bar`, contra `+1.309e9` do termo mútuo, tornando o
+incremento `+9.10e9`, positivo **[T]**) e é fisicamente sugestiva — é literalmente luminosidade de
+acreção. Três razões para não fazê-lo, em ordem de peso:
+
+1. **Contaminaria a quantidade conservada com um parâmetro `[A]`.** `U_self` é uma função fechada
+   das massas, `-K_BIND G m_bar^(1/3) R_ref^(-1) Σ_k m_k^(5/3)`, e para `N = 1000` corpos iguais vale
+   `8.009e12 J`, isto é **`1.246 |E_0|`** — **maior que a energia que liga o aglomerado inteiro**
+   **[T]**. `E_total` passaria a ser dominada por um termo cujo valor é fixado por `K_BIND` e por
+   `chi`, ambos marcados `[A]` e ambos escolhidos por razões que nada têm a ver com energia
+   (Seção 4.6.2). O diagnóstico `(D1)` seria destruído: `E_total` mediria a história de fusões vezes
+   uma constante arbitrária, e não o integrador.
+2. **Obrigaria a refazer a erosão para não contar duas vezes.** `E_custo = f_chip E_lig` já é um
+   custo de coesão. Com `U_self` no orçamento, `E_custo` teria de **ser** a variação de `U_self`, e
+   `E_lig` não é a derivada de `E_self` em relação à massa arrancada. Fechar isso é uma camada de
+   modelagem inteira, contra o critério do projeto.
+3. **Não muda uma única trajetória.** `U_self` é função só das massas; o seu gradiente em relação às
+   **posições** é nulo, logo ele não entra na força. Seria contabilidade pura, comprada ao preço de
+   `1` e `2`.
+
+**O que fica registrado no lugar dele:** a frase de escopo. *Neste modelo, o poço gravitacional
+mútuo de um par que funde é apagado de `U` e reaparece em `E_int` com sinal negativo, porque um
+corpo pontual não tem onde guardá-lo.* Quem quiser `E_int` como calor puro precisa de corpos com
+estrutura interna, que é outro projeto.
+
 **Rótulo obrigatório no HUD e em toda figura, SUBSTITUINDO o anterior:**
 `E_total = K + U + E_int (colisoes contabilizadas exatamente; residuo = arredondamento + truncamento
-do integrador)`. Continua **proibido** ler `E_total` como diagnóstico do integrador no regime
+do integrador; E_int = energia INTERNA dos produtos, com sinal, NAO dissipacao)`. Continua **proibido** ler `E_total` como diagnóstico do integrador no regime
 pós-runaway, pela razão da Seção 4.11 `(D1)`, que é sobre magnitude relativa e não sobre omissão de
 termos — essa proibição sobrevive intacta e agora é a **única** ressalva sobre a curva.
 
@@ -3322,7 +3429,7 @@ canais               cada um >= 5%    RISCO: a fusao e' o canal em risco, Sec. 4
 |---|---|
 | `max m_i` ainda `>> 10 m_bar` | sobrou dependência de `x` com a massa em algum ramo — conferir se `v_esc_eff` foi de fato retirado |
 | canal de fusão `< 5%` | a distribuição de `\|u\|` no núcleo é mais dura que o previsto; alavanca declarada: **reduzir** `v_coh` (Seção 4.6.2) |
-| `E_int` grande e **negativo** | o sinal de fragmentação não foi corrigido |
+| `E_int` grande e **negativo** | ~~o sinal de fragmentação não foi corrigido~~ **EMENDADO 2026-08-09 (f): sob os portões determinísticos isto é a PREDIÇÃO, não o sintoma** — toda fusão decresce `E_int` por identidade com o portão 1 (Seção 4.10). A leitura invertida vale agora: `E_int` **crescendo** num regime dominado por fusão é que denuncia bug. |
 | `N_final > 950` | eventos não disparando; conferir detecção |
 
 #### 4.13.4 Resultado da revisão (b) — a predição falhou de novo, e aqui o modelo PARA de ser mexido
@@ -4773,6 +4880,24 @@ antes e depois de cada mapa, com posições congeladas:
 > mas é uma divergência entre código e especificação, e é exatamente o tipo de coisa que este
 > documento existe para impedir.
 
+> # RETIRADO em 2026-08-09 (f) — ESTE PISO REPROVA A IMPLEMENTAÇÃO CORRETA DA REVISÃO (f).
+>
+> O piso `>= 1e-8` existia para detectar que os termos de terceiro corpo estavam sendo computados
+> **contra** uma especificação que mandava omiti-los. A revisão (f) **manda computá-los**
+> (Seção 4.10, regra única), de modo que o resíduo passa a ser de arredondamento **por construção** —
+> exatamente a condição que este piso reprova. Ele e o teto `1e-5` da mesma cláusula são
+> **mutuamente inconsistentes** com `INV-36` (`<= 1e-12`), e a inconsistência é literal: nenhum valor
+> satisfaz `>= 1e-8` e `<= 1e-12` ao mesmo tempo.
+>
+> **`INV-23(a)` fica SUBSUMIDO por `INV-36`.** O teto volta a `1e-12` (fp64), o piso desaparece, e o
+> papel de "garantir que o teste não vire vazio" migra para a cláusula de independência de `INV-36`
+> abaixo — que é a forma certa de fazê-lo, porque um piso sobre o resíduo mede a **magnitude do
+> erro** quando o que se quer medir é a **independência do caminho de cálculo**.
+>
+> **Registro do mecanismo, porque ele se repete:** este piso foi escrito para proteger uma decisão
+> de modelagem (omitir um termo) e sobreviveu à revogação dessa decisão. Um teste que codifica uma
+> aproximação, e não uma lei, expira quando a aproximação expira — e não avisa.
+
 **Deriva acumulada esperada, e NÃO é falha.** Ao longo de `3 t_ff` com `~500` eventos, o resíduo de
 sinal único acumula `~1.2e-3 |E_0|`, isto é **`0.12%`** **[M]**. Isso é o comportamento **previsto**
 de uma implementação correta sob esta especificação. Um teste que exija `|ΔE_total/E_0| < 1e-3` numa
@@ -5082,6 +5207,15 @@ com a regra única da Seção 4.10 nada é omitido, e a única fonte de resíduo
 `U`, cujo erro relativo é `O(sqrt(N) eps_prec) ≈ 3.5e-15` para `N = 1000`. `1e-12` é `~300x` acima
 disso.
 
+**Cláusula de INDEPENDÊNCIA — obrigatória, e sem ela `INV-36` é uma TAUTOLOGIA.** O `U` do "antes" e
+do "depois" tem de ser recomputado pelo **caminho global independente**
+(`observables.potential_energy` sobre o sistema inteiro, `O(N²)`), **jamais** pela expressão de `ΔU`
+que o próprio evento usou. Com a regra `E_int += -(ΔK + ΔU)`, usar o mesmo `ΔU` nos dois lados dá
+`0` identicamente **qualquer que seja o `ΔU`**: um `eps` errado, um `d~` errado ou um termo de campo
+inteiro faltando passariam, porque o erro cancela contra si mesmo. **É a única cláusula desta lista
+que dá conteúdo às outras.** O teste é caro (`O(N²)` por evento) e por isso roda numa configuração
+reduzida (`N <= 200`) e amostrada, não em `RUN_COLLISION` inteira.
+
 **Cláusula agregada, obrigatória e separada.** Ao longo de `RUN_COLLISION` completa:
 
 ```
@@ -5096,6 +5230,15 @@ cláusula agregada é a que converte esse `62/62` em `0/n`.
 **Se falhar com resíduo de SINAL ÚNICO.** Um termo inteiro está faltando na soma — quase certamente
 `Delta U_campo`, que é o defeito `6`. Sinal único é a assinatura de omissão; sinal alternante é a
 assinatura de arredondamento.
+
+**PROIBIÇÃO EXPLÍCITA, dirigida ao engenheiro de testes.** `INV-36` é sobre `K + U + E_int`, o
+**total**. **Nenhum teste desta suíte pode fixar o sinal de `E_int` nem exigir que ele cresça.** Sob
+os portões determinísticos, toda fusão **decresce** `E_int` por identidade com o portão 1, e a
+erosão decresce em `~11%` do espaço de parâmetros (Seção 4.10). Um teste `E_int >= 0`, `ΔE_int >= 0`
+ou `E_int` monótona **reprovaria a implementação correta**, e reprovaria por uma propriedade que o
+modelo tem de propósito. O que **é** testável, e substitui isso com mais força, é a decomposição por
+canal: `E_int_ricochete` monótona **crescente** (sinal garantido), `E_int_fusao` monótona
+**decrescente** (sinal garantido), `E_int_erosao` sem cota. Ver Seção 4.10, cláusula 3.
 
 **Se falhar SÓ nos eventos com `n_events > 1` no mesmo passe.** A regra do estado corrente
 (Seção 4.5, item 3) não foi implementada: os eventos estão sendo avaliados todos contra a
@@ -5529,7 +5672,13 @@ ENS_RUNAWAY_THRESHOLD = 0.10             # (C7) max_i m_i / M_real
 # logo nao ha sumidouro de massa.  Medido: max m_i = 321.26 m_bar.
 ENS_N_FINAL_PREDICTED  = (700, 900)      # [A] Sec. 4.13.6
 ENS_MAX_MASS_FRACTION  = (0.15, 0.60)    # [A] max_i m_i / M_real em 3 t_ff
-ENS_EINT_MAG_RANGE     = (3.0, 40.0)     # [A] max_t |E_int|/|E_0|
+# ENS_EINT_MAG_RANGE = (3.0, 40.0): RETRATADA em 2026-08-09 (f).  NAO alargada -- RETIRADA.
+#   Era uma predicao [A] sobre max_t |E_int|/|E_0| calibrada no modelo ESTOCASTICO, cujo E_int era
+#   dominado pela fragmentacao com sinal indefinido.  Sob os portoes deterministicos os condutores
+#   sao outros e o sinal de dois dos tres canais e' FIXO (Sec. 4.10), logo a faixa nao transfere.
+#   Regra que isto instancia: uma predicao registrada contra um modelo que foi SUBSTITUIDO nao
+#   sobrevive a substituicao -- reaproveita-la seria escolher a faixa depois de conhecer o modelo.
+#   E_int passa a REPORTADO com sinal E RESOLVIDO POR CANAL, sem faixa predita.
 # ENS_RUNAWAY_TFF = (1.2, 2.0): RETIRADA em 2026-08-09 (Sec. 4.13.8(5)).  NAO alargada --
 #   retirada; t_runaway passa a NUMERO REPORTADO.  Tres motivos, todos ANTERIORES ao resultado
 #   que a excedeu: (i) desenhada em torno de 1.55, que pertence a outra grandeza; (ii) passou com
@@ -6544,3 +6693,52 @@ novo.** Cinco itens.
     ignorava os corpos que colidiram. **Um teste de conservação precisa de um companheiro que
     verifique que algo mudou**, e é isso que as cláusulas de não trivialidade de `INV-20` e
     `INV-38(2b)` acrescentam. Seções 4.9(1), 4.9(3), 6.
+
+### Adendo à revisão (f) — 2026-08-09, o sinal de `E_int` sob portões determinísticos
+
+82. **TODA fusão decresce `E_int`, por identidade com o próprio portão.** `E_int += E_rel - ΔU_campo`
+    com `E_rel = T_cm - G m_i m_j/d~_c`, e `E_rel < 0` **é** o portão 1. Não é um caso próximo do
+    softening: é o caso genérico, sem exceção. Cota por evento `|ΔE_int| <= G m_i m_j/d~_c`, que vale
+    `2.04e-4 |E_0|` para `m_bar`–`m_bar` e `1.40e-1 |E_0|` para `1000 m_bar`+`m_bar` **[T]**.
+    **Isto é uma consequência da decisão (b) que não existia antes:** com o mapa estocástico
+    `p_fus > 0` para todo `x`, o sinal era **indefinido**; com o portão, ficou **fixo e negativo**.
+    Seção 4.10.
+83. **A erosão também decresce, em `11.3%` do espaço de parâmetros, pior caso `-0.486 T_cm`** **[M]**.
+    `ΔK < 0` sempre, mas transferir massa do menor para o maior **reduz** `m m'`, o poço mútuo fica
+    mais raso e `U` sobe. **Só o ricochete tem sinal garantido.** Seção 4.10.
+84. **`E_int` NÃO é "energia dissipada" e a prosa que assim a chamava está proibida.** É a **energia
+    interna dos produtos de colisão**, e a de um objeto ligado é negativa. Decompõe-se em calor
+    (positivo) e ligação armazenada (negativa), e **este modelo não separa as duas**. Forma
+    permitida: *"energia interna dos produtos de colisão (calor mais ligação armazenada, sem
+    separação entre as duas)"*. A Seção 4.11 `(D2)` fica emendada. Seção 4.10.
+85. **Termo de auto-energia na fusão: VETADO.** Funciona algebricamente e tornaria `E_int` calor puro
+    (`ΔU_self = -9.409e9 J` contra `+1.309e9` do termo mútuo, incremento `+9.10e9`). Rejeitado
+    porque `|U_self| = 1.246 |E_0|` para `N = 1000` iguais — **maior que a energia que liga o
+    aglomerado** — e é fixado por `K_BIND` e `chi`, ambos `[A]`: a quantidade **conservada** passaria
+    a ser dominada por uma constante arbitrária e `(D1)` seria destruído. Além disso obrigaria a
+    refazer `E_custo` para não contar duas vezes, e **não mudaria uma única trajetória** (`U_self`
+    não tem gradiente em posição). Seção 4.10.
+86. **O piso `max_evento |Δ(K+U+E_int)|/|E_0| >= 1e-8` de `INV-23(a)` está RETIRADO: ele reprovava a
+    implementação correta da revisão (f).** Ele existia para detectar que os termos de terceiro corpo
+    estavam sendo computados **contra** uma especificação que mandava omiti-los; a revisão (f) manda
+    computá-los. Era literalmente insatisfazível junto com `INV-36` (`>= 1e-8` **e** `<= 1e-12`).
+    **Mecanismo que se repete, e é a razão de registrar isto: um teste que codifica uma aproximação,
+    e não uma lei, expira quando a aproximação expira — e não avisa.** Seção 6, `INV-23(a)`.
+87. **`INV-36` ganha cláusula de INDEPENDÊNCIA, sem a qual é uma tautologia.** O `U` de antes e
+    depois tem de vir de `observables.potential_energy` sobre o sistema inteiro, **nunca** da
+    expressão de `ΔU` que o evento usou: com `E_int += -(ΔK + ΔU)`, usar o mesmo `ΔU` nos dois lados
+    dá `0` identicamente **qualquer que seja o `ΔU`** — `eps` errado, `d~` errado ou o termo de campo
+    inteiro faltando passariam, porque o erro cancela contra si mesmo. Roda em `N <= 200` amostrado.
+    Seção 6, `INV-36`.
+88. **Proibição dirigida ao engenheiro de testes: nenhum teste pode fixar o sinal de `E_int` nem
+    exigir que ele cresça.** O que substitui isso, com mais força do que o sinal do agregado jamais
+    teve, é a decomposição por canal — `E_int_ricochete` monótona **crescente**, `E_int_fusao`
+    monótona **decrescente**, `E_int_erosao` sem cota — reportadas separadamente no CSV e no HUD.
+    A linha de diagnóstico da Seção 4.13.3 (*"`E_int` grande e negativo → o sinal da fragmentação não
+    foi corrigido"*) está **invertida**: sob os portões, `E_int` **crescendo** num regime dominado por
+    fusão é que denuncia bug. Seções 4.10, 4.13.3, 6.
+89. **`ENS_EINT_MAG_RANGE = (3.0, 40.0)` está RETRATADA, não alargada.** Era `[A]` calibrada no modelo
+    estocástico, cujo `E_int` era dominado pela fragmentação com sinal indefinido. **Uma predição
+    registrada contra um modelo que foi substituído não sobrevive à substituição** — reaproveitá-la
+    seria escolher a faixa depois de conhecer o modelo, que é o ajuste post-hoc que este documento
+    proíbe. Seção 8.
