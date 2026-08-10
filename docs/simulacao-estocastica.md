@@ -1352,8 +1352,30 @@ Logo o passe conserva. **[T]** Em ponto flutuante o resíduo é de um arredondam
 **O pareamento guloso é uma aproximação, e isso é declarado.** Depois que `(i,j)` colide em `t*_1`,
 a trajetória de `i` muda, de modo que um candidato posterior `(i,k)` com `t*_2 > t*_1` deveria ser
 **reavaliado**, não simplesmente rejeitado. Rejeitá-lo adia o evento para o passo seguinte, e se por
-lá o par já estiver se afastando a guarda de aproximação o descarta de vez. **Este é o ÚNICO canal
-pelo qual uma colisão se perde neste modelo** — não há tunelamento (Seção 4.4.2).
+lá o par já estiver se afastando a guarda de aproximação o descarta de vez. ~~**Este é o ÚNICO canal
+pelo qual uma colisão se perde neste modelo**~~ — não há tunelamento (Seção 4.4.2).
+
+> **CORRIGIDO em 2026-08-10: "o ÚNICO canal" é FALSO desde a revisão (f), e a própria frase acima
+> contém o motivo.** Ela reconhece que *"depois que `(i,j)` colide em `t*_1`, a trajetória de `i`
+> muda"*, e então tira dessa premissa **apenas** a consequência sobre pares que **já eram**
+> candidatos. A outra consequência — que um par que **não era** candidato pode passar a sê-lo,
+> porque um dos seus corpos foi redirecionado no meio do passe — estava contida na mesma premissa e
+> nunca foi escrita. Medida em 2026-08-10: `|Δv| = 4.7029` contra `9.2085e-3` gravitacional, fator
+> `511`, produzindo uma sobreposição que nenhum dos mecanismos documentados explicava **[M]**.
+>
+> **São dois canais de adiamento, e eles têm a MESMA raiz:** o conjunto de candidatos é fixado
+> contra a trajetória de **início de passe** e nunca é rederivado dentro dele.
+> `(a)` **adiamento por disjunção** — o par era candidato e foi rejeitado;
+> `(b)` **adiamento por redirecionamento** — o par não era candidato e passou a ser.
+> Nenhum dos dois **perde** o contato: ambos o empurram para o passo seguinte, onde o ramo `c <= 0`
+> da Seção 4.3 o pega em `t_c = 0`. A palavra correta é **adiar**, não perder, e ela vale para os
+> dois.
+>
+> **Consequência quantitativa, e é a que obriga uma medição nova: `f_reject` NÃO mede o adiamento
+> total.** Um par redirecionado é adiado **sem nunca aparecer na contagem de candidatos**, logo não
+> entra nem no numerador nem no denominador de `f_reject`. Todos os valores publicados
+> (`0.407%`, `6.80%`, `2.53%`) são cotas **inferiores** do adiamento real, por uma margem que
+> ninguém mediu. A grandeza que fecha isso é `f_redirect` (`INV-35`), e ela é **nova**.
 
 **Definição normativa de `f_reject`, POR PASSE.** A versão anterior dizia "sobre toda a execução" sem
 definir se o agregado era por passe ou global, e sem dizer como contar quando um contato persiste por
@@ -2138,6 +2160,63 @@ Ricochete: `u' . n = -e u_n > 0` para `e > 0`. Erosão: `u' ∥ u_r` e `u_r . n 
 seguinte exige que a gravidade tenha revertido o movimento relativo. Isto é `INV-34`, e é o
 enunciado que a Seção 4.9.1 deveria ter tido quando escreveu *"impede recolisão imediata"* sem
 verificar a magnitude. Ver `INV-35` para a forma sobrevivente do enunciado sobre sobreposição.
+
+> # EMENDA 2026-08-10 — a enumeração de mecanismos desta subseção estava INCOMPLETA, e a correção não é acrescentar um item
+>
+> **O que foi medido.** Suíte da revisão (f), `112` passam / `1` falha. A falha é
+> `INV-35`: `1` de `40` sobreposições não é explicada nem por candidato adiado nem por mudança de
+> massa — os **dois** mecanismos que esta subseção nomeava. Caso reproduzido: passo `366`, par
+> `(14, 64)`, `N = 120`, `dt = 5e-5`, `cold_sphere` semente `20190222`. O par **não era candidato**
+> no início do passo; **nenhuma das duas massas mudou** (`8.584909e9` e `1.0e9`, idênticas). O que
+> houve: o corpo `64` ricocheteou no `17` em `t_c = 1.9479e-5`, mudou de velocidade por
+> `|Δv| = 4.7029` contra `9.2085e-3` que o meio-chute gravitacional explicaria — **fator `511`** — e
+> derivou o restante `h - t_c` com a velocidade **nova** para dentro do corpo `14`. **[M]**
+>
+> **Veredito: o achado é real, a especificação estava incompleta, e o teste está certo.** Ele foi
+> escrito para afirmar exaustividade de uma lista, e é exatamente por isso que ele encontrou o
+> buraco. Um teste que afirmasse apenas "poucas sobreposições" teria passado.
+>
+> **Mas a correção NÃO é uma terceira cláusula**, e a razão é que os dois itens desta lista nunca
+> foram mecanismos independentes. "Candidato adiado" e "mudança de massa" são **sintomas**
+> enumerados por causa, e uma lista enumerada por causa cresce um item toda vez que alguém encontra
+> um caso — o que é o oposto de uma especificação. A enumeração está **substituída** por uma
+> classificação por **procedência**, com duas cláusulas e demonstração de exaustividade, em
+> `INV-35`. O mecanismo do dev não é um terceiro item: é uma instância da cláusula `(2)`, que a
+> prosa antiga não nomeava porque perguntava *"o que mudou?"* em vez de *"quem foi tocado?"*.
+>
+> **E o registro que importa mais que a correção, apontado pelo coordenador: este mecanismo NÃO
+> EXISTIA ANTES, e foi a correção do defeito `1` que o criou.** No modelo antigo o impulso elástico
+> era identicamente nulo em `t*` interior (Seção 4.3): **o ricochete não redirecionava ninguém**.
+> Toda afirmação geométrica sobre o pós-evento do canal elástico era **vacuamente verdadeira**,
+> porque o mapa era a identidade. **Lição transferível, e é a terceira desta família neste
+> documento: um operador nulo não tem efeito colateral nenhum, e por isso não obriga a
+> especificação a considerar nenhum. Tornar o operador não nulo obriga a redemonstrar todas as
+> propriedades que ele tocava — e a especificação não avisa quais eram, porque elas nunca foram
+> escritas como dependências.**
+>
+> **A profundidade da sobreposição induzida NÃO é desprezível, e a cota é fechada.** Com
+> `|Δv_k| = (1+e) mu |u_n| / m_k <= (1+e)|u|`, o deslocamento extra ao fim do passo é
+> `delta <= (1+e) |u| (h - t_c) <= (1+e) |u| h`. Em unidades de `R_i + R_j = 1e-2 m` (par
+> `m_bar`–`m_bar`) **[T]**:
+>
+> | `h` | `\|u\| = 4.64` (núcleo) | `\|u\| = 15` (rebote) | `\|u\| = 36.3` (máx. medido) |
+> |---|---|---|---|
+> | `5e-4` (`DT_COLLAPSE`) | `0.42 R` | `1.35 R` | **`3.27 R`** |
+> | `5e-5` (o repro do dev) | `0.04 R` | `0.14 R` | `0.33 R` |
+>
+> No repro, `1.4354e-4 m`, isto é `0.94%` de `R_sum` **[M]** — raso, mas **porque `dt` era `10x`
+> menor que o de produção**. A `DT_COLLAPSE` a cota chega a `3.3` diâmetros de contato: o
+> redirecionamento pode levar um corpo **além** da zona de contato de um terceiro dentro do mesmo
+> passo. Isto é **reportado**, não limitado — ver `f_redirect` em `INV-35`.
+>
+> **Por que não é patológico, e por que não se corrige com um laço.** No passo seguinte o par entra
+> pelo ramo `c <= 0` da Seção 4.3, com `t_c = 0`, e é resolvido na configuração corrente — que é
+> literalmente o que o veto da Seção 4.5 prescreve para sobreposição residual. Nenhuma posição é
+> movida, nenhuma energia é injetada, nenhuma conservação é tocada. **Alavanca declarada, NÃO
+> adotada:** iterar o passe (redetectar sobre `[t_c, h]` para os corpos tocados) reduziria o
+> fenômeno sem eliminá-lo — a redeteção é ela própria contra uma trajetória que um evento posterior
+> pode mudar — ao custo de um laço com contagem dependente de dados, uma prova de terminação, e uma
+> redefinição de `f_reject`. Adotar só se `f_redirect` exceder a linha de atenção de `INV-35`.
 
 ##### (D.3) Garantias fechadas da erosão
 
@@ -5170,10 +5249,67 @@ mais fraco (não impede recolisão em passos futuros) e é **verdadeiro**.
 
 ### `INV-35` — Sobreposição: o enunciado que sobrevive
 
-**Enunciado.** Ao fim de todo passe de colisão, **não existe par `(i, j)` que esteja simultaneamente
-sobreposto (`|r_i - r_j| < R_i + R_j`) e se aproximando (`(r_j - r_i) . (v_j - v_i) < 0`)**, exceto
-os pares adiados pelo pareamento disjunto, que são contados em `f_reject` e reportados
-separadamente.
+> **REESCRITO em 2026-08-10.** O enunciado anterior — *"não existe par sobreposto e se aproximando,
+> **exceto os pares adiados pelo pareamento disjunto**"* — nomeava **um** mecanismo de exceção, e a
+> Seção 4.9(D.2) nomeava **dois**. Medido: `1` de `40` sobreposições não é explicada por nenhum dos
+> dois **[M]**. A correção não acrescenta um terceiro item; substitui a enumeração por **procedência**.
+
+**Enunciado — classificação por PROCEDÊNCIA, duas cláusulas, exaustiva por demonstração.** Ao fim de
+todo passe de colisão, todo par `(i, j)` de slots **vivos** (`m > 0`; slots mortos têm `R = 0` e são
+excluídos, Seção 5) que esteja simultaneamente **sobreposto** (`|r_i - r_j| < R_i + R_j`) **e se
+aproximando** (`(r_j - r_i) . (v_j - v_i) < 0`) satisfaz **pelo menos uma** de:
+
+```
+(1)  o par era CANDIDATO no inicio do passe e foi ADIADO pela disjuncao (entra em f_reject);
+(2)  ao menos um de i, j foi PARTICIPANTE de um evento aceito neste passe.
+```
+
+**Demonstração de exaustividade. [T]** Suponha que nem `(1)` nem `(2)` valham. Por `¬(2)`, nenhum
+dos dois foi tocado por evento algum: massa, raio de contato e velocidade são os que `detect()`
+usou, e ambos percorrem `[0, h]` em movimento retilíneo com essas velocidades. Sob movimento
+retilíneo `d/dt (dr . dv) = |dv|² >= 0`, logo `dr . dv` é **não decrescente**; como o par se
+aproxima em `h`, ele se aproximava em `0`, e a **guarda de aproximação passou**. E sobreposição em
+`h` significa `q(h) = |sep(h)|² - R² < 0`; com `q(0) = c`, ou `c <= 0` (candidato pelo ramo `3` da
+Seção 4.3) ou `c > 0` e existe raiz em `(0, h)` (candidato pelo ramo `4`). **Em ambos os casos o par
+era candidato.** Um candidato ou é aceito — e então é participante, contra `¬(2)` — ou é adiado pela
+disjunção, contra `¬(1)`. Contradição. `∎`
+
+**A cláusula `(2)` é deliberadamente sobre PARTICIPAÇÃO, não sobre o que mudou.** Ela cobre de uma
+vez os três efeitos que um evento tem sobre um slot, e é por isso que a lista não pode crescer de
+novo:
+
+| efeito | canal | o que ele quebra na varredura de `detect()` |
+|---|---|---|
+| **velocidade** muda | os três | a trajetória do restante `h - t_c` não é a que foi varrida — **é este o mecanismo que a suíte encontrou** |
+| **posição** salta | fusão | o sobrevivente vai ao centro de massa: `0.500 R` medido **[M]**, que é o mínimo geométrico |
+| **raio de contato** cresce | fusão, erosão (o receptor) | a esfera de contato do slot é maior do que a usada na detecção |
+
+**Cláusulas de reporte, obrigatórias, NÃO bloqueantes:**
+
+```
+f_defer     = violacoes da classe (1) / passes            (ja coberto por f_reject)
+f_redirect  = violacoes da classe (2) SEM mudanca de massa nem de posicao
+              (isto e', puro redirecionamento por impulso) / eventos aceitos
+delta_max   = max sobre os eventos de |Delta v_k| (h - t_c) / (R_i + R_j) do par sobreposto
+```
+
+`f_redirect` **não existia como grandeza antes de 2026-08-10** e é a única que mede o mecanismo novo.
+**Linha de atenção `f_redirect > 0.05`:** acima dela, adotar a alavanca declarada em 4.9(D.2)
+(iterar o passe). Abaixo, reportar e seguir. `delta_max` tem cota fechada
+`(1+e)|u|h/(R_i+R_j)`, que vale **`3.27`** a `DT_COLLAPSE` com `|u|_max = 36.3 m/s` **[T]** — a
+sobreposição induzida **não** é rasa por construção, é rasa por `dt` pequeno, e a distinção tem de
+estar no relatório.
+
+**Procedimento.** Varredura `O(N²)` ao fim de um passe, a cada `100` passos de `RUN_COLLISION`.
+Para **cada** violação, classificar em `(1)` ou `(2)` e reportar a contagem por classe. **O teste
+falha se alguma violação não cair em nenhuma das duas classes** — que é a forma correta do teste, e é
+a que estava em vigor: ela encontrou o buraco na especificação anterior e tem de continuar podendo
+encontrar o próximo.
+
+> **PROIBIDO afrouxar esta cláusula para fazer o teste passar.** Se aparecer uma violação
+> inclassificável, a demonstração acima está errada ou a implementação viola uma hipótese dela
+> (movimento retilíneo no drift, guarda estrita, `R` constante entre eventos). Nos três casos a
+> resposta é emendar a especificação, nunca a asserção.
 
 > **O enunciado forte — "ausência de sobreposição pós-evento" — está RECUSADO, e a recusa é
 > normativa.** Ele é falso por dois caminhos independentes: a fusão cria um corpo de raio `R(M)`
@@ -6742,3 +6878,54 @@ novo.** Cinco itens.
     registrada contra um modelo que foi substituído não sobrevive à substituição** — reaproveitá-la
     seria escolher a faixa depois de conhecer o modelo, que é o ajuste post-hoc que este documento
     proíbe. Seção 8.
+
+### Adendo à revisão (f) — 2026-08-10, o terceiro mecanismo de sobreposição
+
+90. **A enumeração de mecanismos de sobreposição da Seção 4.9(D.2) estava INCOMPLETA, e a correção
+    não é acrescentar um item.** Medido pela suíte da revisão (f) (`112` passam / `1` falha):
+    `1` de `40` sobreposições não é explicada nem por candidato adiado nem por mudança de massa
+    **[M]**. Reproduzido: passo `366`, par `(14, 64)`, `N = 120`, `dt = 5e-5` — o corpo `64`
+    ricocheteou no `17` em `t_c = 1.9479e-5`, mudou de velocidade por `|Δv| = 4.7029` contra
+    `9.2085e-3` gravitacional (**fator `511`**) e derivou o restante do passo para dentro do corpo
+    `14`. **O teste está certo e encontrou o buraco precisamente porque afirmava exaustividade** —
+    um teste que só exigisse "poucas sobreposições" teria passado. Seção 4.9(D.2).
+91. **"Candidato adiado" e "mudança de massa" nunca foram mecanismos: eram sintomas enumerados por
+    CAUSA.** Uma lista por causa cresce um item cada vez que alguém encontra um caso, o que é o
+    oposto de uma especificação. Substituída por classificação por **procedência**, duas cláusulas,
+    com demonstração de exaustividade: `(1)` o par era candidato e foi adiado pela disjunção;
+    `(2)` ao menos um dos dois foi **participante** de um evento aceito no passe. A cláusula `(2)` é
+    sobre **participação**, não sobre o que mudou, e por isso cobre de uma vez os três efeitos de um
+    evento sobre um slot — velocidade, posição (fusão: `0.500 R` medido **[M]**) e raio de contato.
+    O mecanismo encontrado pelo dev é uma **instância de `(2)`**, não um terceiro item. `INV-35`.
+92. **O mecanismo NÃO EXISTIA ANTES: foi a correção do defeito `1` que o criou.** No modelo antigo
+    o impulso elástico era identicamente nulo em `t*` interior — **o ricochete não redirecionava
+    ninguém**, e toda afirmação geométrica sobre o pós-evento do canal elástico era **vacuamente
+    verdadeira**. **Lição transferível, e é a terceira desta família neste documento: um operador
+    nulo não tem efeito colateral nenhum, e por isso não obriga a especificação a considerar
+    nenhum. Tornar o operador não nulo obriga a redemonstrar todas as propriedades que ele tocava —
+    e a especificação não avisa quais eram, porque elas nunca foram escritas como dependências.**
+    Seção 4.9(D.2).
+93. **"Este é o ÚNICO canal pelo qual uma colisão se perde" (Seção 4.5) é FALSO, e a própria frase
+    continha o motivo.** Ela reconhece que a trajetória muda no meio do passe e tira dessa premissa
+    apenas a consequência sobre pares que **já eram** candidatos; a consequência simétrica — um par
+    que **não era** candidato passa a sê-lo — estava na mesma premissa e nunca foi escrita. São dois
+    canais de **adiamento** com a mesma raiz: o conjunto de candidatos é fixado contra a trajetória
+    de início de passe e nunca é rederivado dentro dele. **Nenhum dos dois perde o contato** — ambos
+    o empurram para o passo seguinte, onde o ramo `c <= 0` o pega em `t_c = 0`, que é o que o veto
+    da Seção 4.5 prescreve. Seção 4.5.
+94. **Consequência quantitativa: `f_reject` NÃO mede o adiamento total, e nunca mediu desde a
+    revisão (f).** Um par redirecionado é adiado **sem aparecer na contagem de candidatos**, logo
+    fica fora do numerador **e** do denominador. `0.407%`, `6.80%` e `2.53%` são todos cotas
+    **inferiores**, por uma margem não medida. A grandeza que fecha isso — `f_redirect`, com linha
+    de atenção `0.05` — é **nova** e não tinha equivalente. Seções 4.5, `INV-35`.
+95. **A sobreposição induzida por redirecionamento NÃO é rasa por construção — é rasa por `dt`
+    pequeno.** Cota fechada `delta <= (1+e)|u|(h - t_c)`; em unidades de `R_i+R_j` ela vale
+    `0.42`/`1.35`/**`3.27`** a `DT_COLLAPSE` para `|u| = 4.64`/`15`/`36.3 m/s` **[T]**. No repro do
+    dev deu `0.94%` de `R_sum` **[M]**, mas com `dt` `10x` menor que o de produção. A distinção tem
+    de estar no relatório: `delta_max` é **reportado**, não limitado. `INV-35`.
+96. **Alavanca declarada e NÃO adotada: iterar o passe.** Redetectar sobre `[t_c, h]` para os corpos
+    tocados reduziria o fenômeno **sem eliminá-lo** — a redetecção é ela própria contra uma
+    trajetória que um evento posterior pode mudar — ao custo de um laço com contagem dependente de
+    dados, uma prova de terminação e uma redefinição de `f_reject`. Adotar **só** se `f_redirect`
+    exceder `0.05`. Nada é injetado e nenhuma conservação é tocada enquanto isso: as posições nunca
+    são movidas. Seção 4.9(D.2).
