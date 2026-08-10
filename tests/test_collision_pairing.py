@@ -26,8 +26,17 @@ Section 9.1.1 now fixes, NORMATIVELY and LITERALLY, the signatures this module u
 discover via a semantic-role binder (tests/_stage2_binding.py, retired from THIS module only --
 other test files still use it for gaps Section 9.1.1 does not close, e.g. nbody.populations'
 signatures): pair_disjoint(candidates: CollisionCandidates) -> AcceptedPairs, both dataclasses of
-1-D tensors (i, j, t_star, rel_speed, contact_radius_sum[, f_reject: float]) -- struct-of-arrays
+1-D tensors (i, j, t_c, rel_speed, contact_radius_sum, u_n[, f_reject: float]) -- struct-of-arrays
 over ALL candidates in one call, not a list of per-pair objects.
+
+RENAME, 2026-08-09 (f): the field that used to be `t_star` (the minimizer of |sep(t)|^2) is now
+`t_c` (the first-contact root, Section 4.3) -- the old name described a quantity pair_disjoint no
+longer receives. pair_disjoint's own logic (greedy acceptance keyed on the lexicographic
+(t_c, i, j) order) is UNCHANGED by this rename: Section 4.5's pairing algorithm never depended on
+what the timestamp inside the key meant physically, only on its ordering. A new field `u_n` (the
+normal component of relative velocity at t_c, Section 4.6) is also present on both dataclasses;
+pair_disjoint's documented job (Section 4.5, steps 1-2) does not read it, so it is filled with a
+harmless placeholder here exactly like rel_speed/contact_radius_sum.
 """
 from __future__ import annotations
 
@@ -74,11 +83,11 @@ def _reference_pair_disjoint(triples):
     ordered = sorted(triples, key=lambda tij: (tij[0], tij[1], tij[2]))
     claimed = set()
     accepted, rejected = [], []
-    for t_star, i, j in ordered:
+    for t_c, i, j in ordered:
         if i in claimed or j in claimed:
-            rejected.append((t_star, i, j))
+            rejected.append((t_c, i, j))
             continue
-        accepted.append((t_star, i, j))
+        accepted.append((t_c, i, j))
         claimed.add(i)
         claimed.add(j)
     return accepted, rejected
@@ -86,17 +95,21 @@ def _reference_pair_disjoint(triples):
 
 def _make_candidates(triples):
     """
-    CollisionCandidates(i, j, t_star, rel_speed, contact_radius_sum), normative per Section
-    9.1.1. rel_speed/contact_radius_sum are filled with harmless placeholder values --
-    pair_disjoint's documented job (Section 4.5 steps 1-2) uses only t*/i/j to decide acceptance.
+    CollisionCandidates(i, j, t_c, rel_speed, contact_radius_sum, u_n), normative per Section
+    9.1.1 (t_c and u_n are the 2026-08-09 (f) renames/additions). rel_speed/contact_radius_sum/u_n
+    are filled with harmless placeholder values -- pair_disjoint's documented job (Section 4.5
+    steps 1-2) uses only t_c/i/j to decide acceptance. u_n is placed strictly negative
+    (Section 4.3: u.n < 0 is guaranteed at t_c) purely so a placeholder never looks like an
+    out-of-contract value to a future reader.
     """
     n = len(triples)
     return collisions.CollisionCandidates(
         i=torch.tensor([t[1] for t in triples], dtype=torch.int64),
         j=torch.tensor([t[2] for t in triples], dtype=torch.int64),
-        t_star=torch.tensor([t[0] for t in triples], dtype=torch.float64),
+        t_c=torch.tensor([t[0] for t in triples], dtype=torch.float64),
         rel_speed=torch.ones(n, dtype=torch.float64),
         contact_radius_sum=torch.full((n,), 0.01, dtype=torch.float64),
+        u_n=torch.full((n,), -1.0, dtype=torch.float64),
     )
 
 
@@ -107,13 +120,13 @@ def _call_pair_disjoint(triples):
 
 
 def _extract_accepted(result):
-    # AcceptedPairs is a struct-of-arrays dataclass (i, j, t_star, ... 1-D tensors), normative
-    # per Section 9.1.1.
+    # AcceptedPairs is a struct-of-arrays dataclass (i, j, t_c, ... 1-D tensors), normative per
+    # Section 9.1.1 (t_c is the 2026-08-09 (f) rename of the former t_star field).
     i_np = result.i.detach().cpu().numpy()
     j_np = result.j.detach().cpu().numpy()
-    t_np = result.t_star.detach().cpu().numpy()
-    # returned as (t_star, i, j), matching the (t_star, i, j) convention used everywhere else in
-    # this module (_CONFLICT_CANDIDATES, _reference_pair_disjoint, ...).
+    t_np = result.t_c.detach().cpu().numpy()
+    # returned as (t_c, i, j), matching the (t_c, i, j) convention used everywhere else in this
+    # module (_CONFLICT_CANDIDATES, _reference_pair_disjoint, ...).
     return [(float(t), int(a), int(b)) for a, b, t in zip(i_np, j_np, t_np)]
 
 
@@ -229,10 +242,11 @@ class TestINV19bNoSlotInTwoEvents:
 # -------------------------------------------------------------------------------------------
 class TestINV19cDeterminism:
     """
-    Section 6, INV-19(c): same input gives an identical event list, including when t* is tied
+    Section 6, INV-19(c): same input gives an identical event list, including when t_c is tied
     bit-for-bit between two candidates that share a particle -- exactly where a missing (i, j)
     tie-break makes the result depend on sort stability or presentation order (Section 4.5,
-    normative: 'a chave de ordenacao inclui (i, j) precisamente para desempatar t* identicos').
+    normative: 'a chave de ordenacao inclui (i, j) precisamente para desempatar t* identicos' --
+    t_c is the 2026-08-09 (f) rename of that field; the tie-break argument is unchanged).
     """
 
     def test_repeated_calls_on_the_same_input_agree(self):
@@ -266,9 +280,9 @@ class TestINV19cDeterminism:
             f"shuffled={pairs_shuffled}, expected={_CONFLICT_EXPECTED_ACCEPTED}"
         )
 
-    def test_tied_t_star_breaks_by_i_j_regardless_of_presentation_order(self):
-        # (0, 1, t=0.1) and (0, 2, t=0.1): exactly tied t*, sharing particle 0. Lexicographic
-        # (t*, i, j) puts (0, 1) first (j=1 < j=2), so it must win regardless of the order the
+    def test_tied_t_c_breaks_by_i_j_regardless_of_presentation_order(self):
+        # (0, 1, t=0.1) and (0, 2, t=0.1): exactly tied t_c, sharing particle 0. Lexicographic
+        # (t_c, i, j) puts (0, 1) first (j=1 < j=2), so it must win regardless of the order the
         # candidates are handed to pair_disjoint in.
         tied = [(0.1, 0, 1), (0.1, 0, 2)]
         reversed_tied = [(0.1, 0, 2), (0.1, 0, 1)]

@@ -338,24 +338,23 @@ INV18A_N_RANDOM_CONFIGS = 200            # "200 configuracoes aleatorias" (Secti
 
 # =============================================================================================
 # docs/simulacao-estocastica.md -- Sections 4.6, 4.7, 4.7.1, 4.9, 4.10, 4.14 (the Floor), 9.1.1,
-# and Section 6 INV-20 .. INV-26, INV-32. Collision RESOLUTION (the three outcomes: elastic,
-# merger, fragmentation) and the E_int/L_spin accumulators. This is the round that was out of
-# scope for the block above (INV-18/19, detection/pairing only); this block closes that gap.
+# and Section 6 INV-20 .. INV-26, INV-32, AS THEY STOOD BEFORE THE 2026-08-09 (f) REVISION.
 #
-# Every value below is transcribed verbatim from Section 7's table or Section 8's constant
-# block, or derived from an explicit argument given in Sections 4.6/4.9/4.10/6/7. Per this file's
-# own header rule, nothing here was fitted to observed resolve() output: every number was fixed
-# by reading the document BEFORE nbody.collisions.resolve()'s body was opened (it never was --
-# only its public signature, via inspect.signature, the same "declared signature is fair game,
-# algorithm is not" convention already used elsewhere in this suite).
+# RETIRED, 2026-08-09 (f): the stochastic (1/x, 3, x)/Z regime map, x = |u|^2/v_coh^2, and the
+# elastic/merger/fragmentation channel names are all SUPERSEDED (docs/simulacao-estocastica.md
+# Section 4.3-4.10, "O MODELO DE COLISAO FOI REFEITO"). INV-25 and INV-26 are retired with them
+# (Section 6). The constants below are kept, UNCHANGED, only because they are still meaningful as
+# a historical record (nbody.collisions.regime_probabilities and CollisionModel.v_coh no longer
+# exist -- confirmed by inspect.signature/dataclasses.fields against the live module, not by
+# reading its body). Nothing in this file imports them any more; see the block below this one for
+# the constants the (f) revision's deterministic-gate model actually needs.
 # =============================================================================================
 
-# --- Section 8: the regime map (Sec 4.7) has no free shape parameter left; MAP_ELASTIC_WEIGHT
-# and MAP_X_CLAMP are the only two constants left in Z = 1/x + MAP_ELASTIC_WEIGHT + x.
+# --- Section 8 (PRE-(f)): the regime map (Sec 4.7) has no free shape parameter left;
+# MAP_ELASTIC_WEIGHT and MAP_X_CLAMP are the only two constants left in Z = 1/x + MAP_ELASTIC_WEIGHT + x.
 MAP_ELASTIC_WEIGHT = 3.0                 # [T] numerator of p_el; Z minimal (=5) at x=1 (AM-GM)
 MAP_X_CLAMP = 1.0e12                     # [T] clamp on x; smallest prob at the clamp = 1e-24
-COLLISION_DRAWS_PER_EVENT = 2            # [T] normative, Sec 4.7.1: u1 then u2, EVERY channel
-FRAG_F_MIN = 0.1                         # f = FRAG_F_MIN + (1 - 2*FRAG_F_MIN) * u2, Sec 4.9
+FRAG_F_MIN = 0.1                         # f = FRAG_F_MIN + (1 - 2*FRAG_F_MIN) * u2, Sec 4.9 (PRE-(f))
 
 # --- Section 7 table, TOL-EVENT-INV: conservation identities exact by construction (INV-20/21/22
 # masses, P, T_cm, K, sum m r), for reductions of a handful of terms per event (O(10), not O(N):
@@ -396,113 +395,159 @@ TOL_EVENT_PRED_WIDE_RATIO_BATCH = 1e-9
 # own margin above -- a statement about this test's reconstruction chain, not resolve() itself.
 TOL_EVENT_INV_ULP_WIDE_RATIO_BATCH = 1000.0
 
-# --- Section 7 table, TOL-EVENT-CONS: |Delta(K+U+E_int)|/|E_0| THROUGH A SINGLE OUTCOME MAP
-# (posicoes congeladas em t*, Sec 4.10), with BOTH a ceiling and a floor.
-#
-# Ceiling (ORIGINAL "physicist's test #1", see the final report): E_int is closed-form at the
-# PAIR level (Sec 4.10 revision) and DELIBERATELY omits third-body terms; the document measures
-# that omitted residual at 2.5e-6 |E_0| per event, "1.2% do termo mutuo, de sinal unico" (Sec
-# 4.10/6). 1e-5 accommodates that measured residual with an explicit 4x margin, stated in the
-# document itself -- NOT fitted here to any output of this suite.
-TOL_EVENT_CONS_FP64 = 1e-5
-TOL_EVENT_CONS_FP32 = 1e-4               # Section 7 table, transcribed
+# --- Section 7 table (PRE-(f)), TOL-EVENT-CONS ceiling/floor as they stood before the (f)
+# revision. RETIRED, 2026-08-09 (f): INV-36 (below) replaces INV-23(a) as the bloqueante per-event
+# energy-accounting test, with TOL_EVENT_CONS_FP64 tightened from 1e-5 to 1e-12 and the floor
+# (TOL_EVENT_CONS_FLOOR = 1e-8) REMOVED -- Section 6's own text: "Ele e o teto 1e-5 da mesma
+# clausula sao MUTUAMENTE INCONSISTENTES com INV-36 (<= 1e-12)... nenhum valor satisfaz >= 1e-8 e
+# <= 1e-12 ao mesmo tempo." Kept here, commented out as a name only, so a future reader who goes
+# looking for TOL_EVENT_CONS_FLOOR finds the retirement note instead of a NameError with no
+# explanation. See the "revision (f)" block below for the live TOL_EVENT_CONS_FP64/FP32 values.
+# TOL_EVENT_CONS_FLOOR retired 2026-08-09 (f); do not reintroduce (Section 6, INV-23(a) box).
 
-# Floor: if an implementation computes the omitted third-body terms anyway (a MORE precise
-# calculation than the specification asks for), the per-event residual collapses to round-off
-# (~1e-13-1e-16) instead of the deliberately-retained ~2.5e-6 |E_0| third-body residual, and MUST
-# be flagged as a spec/implementation divergence -- not praised as "more accurate". This is
-# EXACTLY what TestINV23aThirdBodyFloorCatchesOverPrecision in test_collision_resolution.py
-# exists to catch (course correction from the task brief: an implementation that is MORE precise
-# than the specification must fail this test). 1e-8 is transcribed directly from Section 7/6.
-TOL_EVENT_CONS_FLOOR = 1e-8
-
-# --- Section 7 table, INV-23(c) / (formerly TOL-EINT-NEG, then TOL-EINT-MAG): a THIRD revision,
-# dated 2026-08-08, retired this as a bound entirely. History, oldest to newest:
-#   1. min_t E_int(t) >= -1e-3 |E_0|            (sign floor)
-#   2. min_t E_int(t) >= -1e-2 |E_0|            (sign floor, loosened)
-#   3. max_t |E_int(t)|  <= 1.0  |E_0|          (TOL-EINT-MAG, sign -> magnitude ceiling)
-#   4. REPORTADO, NAO BLOQUEANTE. No numeric bound at all (2026-08-08).
-# All three numeric versions were falsified by later stage-3 measurements (most recently
-# |E_int| = 10.83 |E_0|, Section 6, INV-23(c)); the document's own conclusion is that a fourth
-# numeric ceiling would be exactly the post-hoc tolerance-loosening this project's rules forbid,
-# and that |E_int| >> |E_0| is the correct, expected SIGNATURE of the merger runaway the project
-# now accepts as a genuine result (Section 4.13.5) rather than a defect to bound away. There is
-# therefore no TOL_EINT_* constant to define any more; this note exists so a future reader does
-# not go looking for one. None of this affects TOL_EVENT_CONS_FP64/FLOOR above (Section 7's
-# TOL-EVENT-CONS, the PER-EVENT closed-form ceiling/floor), which is unchanged across all of
-# these revisions and is what this suite's TestINV23aPerEventEnergyAccounting actually tests --
-# INV-23(c) is a separate, ensemble-level (multi-step, whole-run) criterion this suite does not
-# reach (see the final report for why: no RUN_COLLISION campaign wiring exists to test against).
-
-# --- Section 7 table, TOL-PROB: three sums, one division. Structural, not statistical.
+# --- Section 7 table (PRE-(f)), TOL-PROB / INV-25 / INV-26: the regime-map well-formedness and
+# map-vs-sampler consistency tolerances. RETIRED, 2026-08-09 (f) along with INV-25/INV-26
+# themselves (Section 6: "APOSENTADO com regime_probabilities()"; nbody.collisions no longer
+# defines regime_probabilities or CollisionModel.v_coh, confirmed via inspect/dataclasses.fields
+# against the live module). Values kept, unused, as a historical record only.
 TOL_PROB_ULP = 4.0                       # multiplies eps_prec
-
-# --- Section 7 table, TOL-PROB-SYM (INV-25 clause 5, NEW in the 2026-08-07 revision): exact
-# algebraic identity of the map (1/x, MAP_ELASTIC_WEIGHT, x)/Z under x -> 1/x.
 TOL_PROB_SYM_ULP = 100.0
-
-# --- Section 7 table, TOL-PROB-UNIF: the uniform-control substitute (1/3, 1/3, 1/3), a literal
-# constant now (w removed), not a limiting value -- "apertado" in this revision.
 TOL_PROB_UNIF_ULP = 4.0
-
-# --- Section 7 table, TOL-PROB-MIN: min_c p_c beyond the clamp. X_CLAMP^-2 = 1e-24 [T]; 1e-25
-# gives the clamp itself a 10x margin while still sitting 14 orders above the smallest fp32
-# normal (1.18e-38), per Section 4.7's own derivation of why X_CLAMP = 1e12 (not 1e30).
 TOL_PROB_MIN = 1e-25
-
-# --- INV-25 clause 4: p_el(1) = 3/5 exactly (AM-GM: Z = MAP_ELASTIC_WEIGHT + x + 1/x is minimal
-# at x=1, where it equals MAP_ELASTIC_WEIGHT + 2 = 5).
 MAP_P_EL_AT_X_EQUALS_1 = 0.6
-
-# --- INV-25 clause 6: closed-form crossings. p_fus(x) = p_el(x) <=> 1/x = MAP_ELASTIC_WEIGHT <=>
-# x = 1/MAP_ELASTIC_WEIGHT = 1/3. p_frag(x) = p_el(x) <=> x = MAP_ELASTIC_WEIGHT = 3. The elastic
-# plateau is exactly one decade wide, centered on x=1 -- "[1/3, 3]".
 MAP_CROSSING_FUS_EL = 1.0 / MAP_ELASTIC_WEIGHT
 MAP_CROSSING_FRAG_EL = MAP_ELASTIC_WEIGHT
-
-# --- INV-26: |f_c - <p_c>| <= 3 * sqrt(<p_c(1-p_c)> / n_events). This is the formula itself
-# (Section 6, INV-26), not a fixed number -- computed per-test from the realized <p_c>. The
-# constant here is only the number of standard errors, "cota binomial a 3 desvios-padrao,
-# derivada e nao ajustada" (Section 6).
 INV26_N_SIGMA = 3.0
-INV26_CHANNEL_MIN_FRACTION = 0.05        # Section 6, "criterio adicional (calibracao)"
+INV26_CHANNEL_MIN_FRACTION = 0.05
+INV22_F_KS_PVALUE_MIN = 0.01             # PRE-(f) fragmentation f~U(0.1,0.9) KS clause; REMOVED
+                                          # by the (f) rewrite of INV-22 (no draw left to test)
 
-# --- Section 4.9, fragmentation mass split: f in [FRAG_F_MIN, 1 - FRAG_F_MIN] = [0.1, 0.9], and
-# f = FRAG_F_MIN + (1 - 2*FRAG_F_MIN)*u2 is uniform on that interval BY CONSTRUCTION when u2 ~
-# U(0,1) (Section 6, INV-22: "isto e exato por construcao"). KS test against that exact uniform
-# image, same p-value floor reasoning as INV-11 (large-n KS tail is thin; 0.01 gives a controlled
-# false-positive rate for a test explicitly marked stochastic-but-seeded).
-INV22_F_KS_PVALUE_MIN = 0.01
+# =============================================================================================
+# docs/simulacao-estocastica.md -- REVISION (f), 2026-08-09: "O MODELO DE COLISAO FOI REFEITO."
+# Sections 4.3 (first-contact detection), 4.5 (current-state accounting within a pass), 4.6
+# (deterministic gates), 4.9 (the three channels: merger / ricochet / erosion), 4.10 (the single
+# E_int rule with the exact O(N) field term), 4.13.3, and Section 6's INV-20, INV-22, INV-23,
+# INV-32 through INV-38 as rewritten/introduced by this revision.
+#
+# Every value below is transcribed verbatim from Section 7's table or Section 8's constant block,
+# or derived from an explicit [T] argument given in Sections 4.3/4.6/4.9/4.10/6/7. Nothing here
+# was fitted to observed resolve()/detect() output: this suite's own rule (this file's header) is
+# that a number is either copied from the document or derived from a document argument, and the
+# CLAUDE.md task brief for this round adds a stronger constraint specific to collisions.py,
+# integrators.py and config.py -- their SOURCE was never opened, only public signatures via
+# inspect.signature/dataclasses.fields (same "declared signature is fair game, algorithm is not"
+# convention already used elsewhere in this suite).
+# =============================================================================================
 
-# --- INV-32: exactly COLLISION_DRAWS_PER_EVENT (= 2) uniforms per accepted event, for EVERY
-# channel, with zero tolerance -- "Binaria. Sem folga." (Section 6, INV-32). No numeric constant
-# beyond COLLISION_DRAWS_PER_EVENT above; this note exists so a future reader does not go looking
-# for a missing INV32_* tolerance.
+# --- Section 8: the deterministic-gate model's parameters and their defaults. e in (0, 1],
+# e = 0 forbidden by construction (Section 4.9(C): a sticky pair, the approach guard cannot
+# resolve it stably).
+E_RESTITUTION = 0.8                      # [A] default ricochet restitution
+K_BIND = 0.6                             # [A] E_lig = K_BIND * G m_P^2 / R_P; 3/5 = uniform sphere
+FRAG_CHIP_COEFF = 0.5                    # [A] xi = FRAG_CHIP_COEFF * (T_n/E_lig - 1)
+FRAG_CHIP_MAX = 0.5                      # [A] ceiling on f_chip; erosion never removes > half m_P
+FRAG_ENERGY_MAX = 0.9                    # [T] guard: E_custo <= FRAG_ENERGY_MAX * T_r, so T' > 0
+                                          #     for EVERY e in (0,1] (Section 4.9(D), D.3)
+
+# --- Section 4.6.3: the gate-overlap boundary, q = m_G/m_P where E_lig(P) == E_esc exactly (both
+# gates can fire together above this ratio -- precedence, Section 4.6.3/INV-37(1), resolves it).
+GATE_Q_OVERLAP = 6.237                   # [T]
+
+# --- Section 4.6.1/8: worked m_bar-m_bar pair, chi=CHI_DEFAULT. Independent cross-check values
+# for this suite's own v_esc/E_lig computations (Section 4.6, 4.6.2).
+PAIR_D_SOFT_MBAR = 5.0990e-2             # [T] m = sqrt((R_i+R_j)^2 + eps^2)
+PAIR_VESC_SOFT_MBAR = 2.2881             # [T] m/s, portao 1 (SOFTENED distance, the correct form)
+PAIR_VESC_NEWT_MBAR = 5.1668             # [T] m/s, newtonian form -- REJECTED (Section 4.6.1),
+                                          # used only by INV-37(3) to construct the discriminating
+                                          # band (softened classifies ricochet, newtonian would
+                                          # have classified merger)
+PAIR_ELIG_MBAR = 8.0089e9                # [T] J = K_BIND * G * m_bar^2 / R_ref
+
+# --- Section 6, INV-33: the per-channel structural bound on |Delta m_k|/m_k(before) for a slot
+# alive on both ends of an event. Ricochet touches no mass at all (exact, zero tolerance); erosion
+# is capped by FRAG_CHIP_MAX on the LOSING (smaller) slot's own fraction, and the same cap
+# (m_chip <= FRAG_CHIP_MAX*m_P <= FRAG_CHIP_MAX*m_G) on the receiving slot's fraction of m_G;
+# merger's one surviving slot gains at most m_P/m_G <= 1 (Section 6, INV-33's own worked bound).
+INV33_RICOCHET_MASS_JUMP_MAX = 0.0                # exact
+INV33_EROSION_MASS_JUMP_MAX = FRAG_CHIP_MAX       # 0.5
+INV33_MERGER_MASS_JUMP_MAX = 1.0                  # m_menor/m_maior <= 1
+BASE_MASS_JUMP_MAX = 1.207               # [M] OLD model baseline this invariant exists to beat
+                                          # (index-rule slot assignment, Section 6/8)
+
+# --- Section 6, INV-20: the non-triviality clause that distinguishes a real impulse from the OLD
+# model's null map (t*-detection resolved u.n == 0 identically, Section 4.3's defect 1).
+INV20_UN_OVER_U_MIN = 1e-12              # |u.n| >= this * |u|, strict approach guaranteed by 4.3
+INV20_LIMIT_CASE_ULP = 100.0             # e=1 must reproduce the OLD elastic map bit for bit,
+                                          # multiplies eps_prec (Section 6, INV-20 "clausula de
+                                          # caso-limite")
+INV20_DELTA_K_REL_TOL = 1e-12            # |Delta K / (-(1/2) mu (1-e^2) u_n^2) - 1| <= this
+# The document's ratio form is a difference of two O(1e9-1e11) numbers (k_after - k_before)
+# divided by a PREDICTED value that shrinks toward zero for grazing encounters (u_n -> 0) -- this
+# suite's own wide (u_n/|u| in [0.02, 0.9]) ricochet-targeting sweep hits near-cancellation there
+# by construction (not a resolve() precision issue: a single well-conditioned event, cos_theta not
+# tiny, meets the document's bare 1e-12 directly). Observed worst case across the 500-event sweep:
+# 3.45e-12; this keeps an explicit ~30x margin over that observation for the wide-batch check only.
+INV20_DELTA_K_REL_TOL_WIDE_BATCH = 1e-10
+
+# --- Section 6, INV-22 (rewritten): the erosion invariant's closed-form checks.
+INV22_T_PRIME_REL_TOL = 1e-12            # |(1/2) mu' |u'|^2 / T' - 1| <= this
+INV22_DISPLACEMENT_ULP = 100.0           # |(r_P'-r_G')-(r_P-r_G)| / d_c <= this * eps_prec
+INV22_SPEED_RATIO_TABLE = {              # Section 6, INV-22: sqrt(max(e^2-FRAG_CHIP_MAX,
+    1.0: 0.7071,                         # (1-FRAG_ENERGY_MAX)*e^2)), tabulated per e (measured
+    0.8: 0.3742,                         # minima over the document's own sweep were tighter:
+    0.5: 0.1581,                         # 0.8165/0.4320/0.1623/0.0633 -- the FORMULA is what this
+    0.2: 0.0632,                         # suite tests, computed at each e, not these table values
+}                                         # directly (they are the document's own worked numbers,
+                                          # kept here only as a cross-check of the formula itself)
+
+# --- Section 6, INV-23/INV-36: E_total = K + U + E_int per-event accounting, REVISION (f).
+# TOL-EVENT-CONS tightened from 1e-5 to 1e-12 (fp64): with the single E_int += -(dK+dU) rule and
+# the O(N) field term COMPUTED (not omitted), the only residual left is round-off on an O(sqrt(N)
+# eps_prec) reduction, ~3.5e-15 for N=1000 -- 1e-12 keeps ~300x margin (Section 6, INV-36).
+TOL_EVENT_CONS_FP64 = 1e-12
+TOL_EVENT_CONS_FP32 = 1e-5
+# INV-36's aggregate, whole-run clause: sum of per-event residuals / |E_0| <= this, and the number
+# of events with residual > TOL_EVENT_CONS_FP64 must be exactly 0 (structural, not a percentile).
+INV36_AGGREGATE_REL_TOL = 1e-9
+
+# --- Section 6, INV-38.
+INV38_EVENT_SET_N_CONFIGS = 200_000      # [harness] reduced from the document's "2e6" for suite
+                                          # speed; this is a DETERMINISTIC geometric-algebra
+                                          # equivalence (Section 4.3's own [T] proof), not a
+                                          # statistical estimate, so a smaller N still gives a
+                                          # valid pass/fail on the claimed discrepancy fraction
+INV38_EVENT_SET_MAX_DISCREPANT_FRACTION = 1e-5    # Section 6: "fracao discrepante esperada < 1e-5"
+INV38_EVENT_SET_BOUNDARY_ULP = 100.0     # |q(h)| <= this * eps_prec * R^2 (measure-zero boundary)
+INV38_SIGN_MEDIAN_MIN = 0.30             # Section 6, INV-38(2): BLOQUEANTE, on the MEDIAN, not
+                                          # the minimum (rasping encounters have |u.n|/|u| -> 0
+                                          # legitimately)
+INV38_SIGN_MEDIAN_PREDICTED = 0.7071     # [T] sqrt(0.5); (u.n/|u|)^2 ~ U(0,1) under impact
+                                          # parameter uniform in the disk of radius R
+INV38_SIGN_MEDIAN_OLD_MODEL_MAX = 1e-5   # [M] the OLD t*-detection median this invariant exists
+                                          # to reject (measured < 1e-5, Section 6)
+INV38_ROOT_REL_TOL = 1e-13               # rationalized root vs extended precision, for
+                                          # 4ac/b^2 <= 1e-12 (Section 6, INV-38(3))
+# The specific near-cancellation case the physicist measured: a=1, b=-1e6, c=1e-6
+# (4ac/b^2 = 4e-18). The rationalized form matches a 50-digit reference to INV38_ROOT_REL_TOL; the
+# CANONICAL form (-b-sqrt(D))/(2a) is REQUIRED to fail catastrophically here (measured: returns
+# 0.0 -- total cancellation, not mere degradation) -- this is the case Section 6, INV-38(3)
+# requires the suite to include so the choice of the stable form is actually exercised, not just
+# asserted.
+INV38_CANCELLATION_CASE = dict(a=1.0, b=-1.0e6, c=1.0e-6)
+
+# --- Section 6, INV-37: gate precedence/coverage/continuity.
+INV37_BOUNDARY_REL_TOL_ULP = 100.0       # clause 2: the fusion/ricochet crossing must sit at
+                                          # v_esc to within this * eps_prec (multiplies eps_prec)
+INV37_CONTINUITY_T_N_OVER_E_LIG_EXCESS = 1e-6   # clause 4: T_n/E_lig - 1 = 1e-6
+INV37_CONTINUITY_U_PRIME_REL_TOL = 1e-5  # |u' - u_r| <= this * |u|
 
 # --- Synthetic-event construction parameters for this test module (test_collision_resolution.py)
-# ONLY -- these are testing-harness choices (how many events, over what x-range, at what mass
-# ratio), not values transcribed from the document, and are kept here purely so this file remains
-# the single place a reviewer checks for "was any number picked after seeing output". They were
-# chosen BEFORE running the suite once and never adjusted afterward.
-RESOLUTION_N_EVENTS_PER_CHANNEL = 500     # matches Section 6, INV-20/21/22: "500 eventos sinteticos"
+# ONLY -- testing-harness choices (how many events, at what mass ratio), not values transcribed
+# from the document, kept here so this file remains the single place a reviewer checks for "was
+# any number picked after seeing output". Chosen before running the suite and never adjusted
+# afterward.
+RESOLUTION_N_EVENTS_PER_CHANNEL = 500     # matches Section 6, INV-20/22: "500 eventos sinteticos"
 RESOLUTION_MASS_RATIO_MAX = 1000.0        # Section 6, INV-20: "razao de massa ate 1000"
-RESOLUTION_X_LOG_RANGE = (2.0e-2, 1.3e2)  # Section 4.8, REVISED in the 2026-08-07 (b) map-fix:
-                                           # x = |u|^2/v_coh^2 alone (Sec 4.6, no more v_esc_eff),
-                                           # measured visited range "x in [~0.02, ~122]" over
-                                           # |u| in [0.5, 36.3] m/s -- widened slightly in
-                                           # log-space for margin. The PREVIOUS revision's range
-                                           # ("x in [0.12, ~108]", with v_esc_eff included) is
-                                           # superseded and no longer used anywhere in this file.
-RESOLUTION_GEOMETRY_SEED = 20260807_01    # arbitrary, fixed; geometry RNG only, NEVER the
-                                           # collision-outcome generator under test
-RESOLUTION_CHANNEL_FRACTION_TEST_X = 2.00  # Section 4.12 (b): "x = |u|^2/v_coh^2 = 2.00 no
-                                           # nucleo" -- REVISED from 1.67 (Section 4.7's map-value
-                                           # table lists 1.67 as an illustrative x, not the
-                                           # core-typical value under the corrected x formula;
-                                           # Section 4.8's own table gives x = 2.0012 at the
-                                           # core-typical |u| = 4.64 m/s, and Section 4.12 rounds
-                                           # this to 2.00). Representative single x for the
-                                           # INV-26 statistical channel-fraction
-                                           # test (a genuine binomial check needs one shared <p_c>)
-RESOLUTION_CHANNEL_FRACTION_N_EVENTS = 4000  # matches INV-13's scale (Section 6); n large enough
-                                           # that the 3-sigma band is a real, not vacuous, check
+RESOLUTION_GEOMETRY_SEED = 20260807_01    # arbitrary, fixed; geometry RNG only -- there is no
+                                           # collision-outcome generator left to keep separate from
+                                           # (Section 4.7.1 (f): zero draws, every channel)
