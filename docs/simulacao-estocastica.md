@@ -968,32 +968,150 @@ Plummer, não os de massas pontuais. Isso não é um erro — é a semântica co
 para o par de massa média. **[T]** Ver a Seção 4.6, onde essa distinção entra explicitamente no
 parâmetro de regime, e a emenda a `integradores.md` §10 na Seção 9.
 
-### 4.3 Detecção varrida — a álgebra está correta
+### 4.3 Detecção — no PRIMEIRO CONTATO, não na aproximação máxima
 
-Sobre um passo `[0, h]`, com `dr = r_j - r_i` e `dv = v_j - v_i` constantes (movimento retilíneo), a
-separação ao quadrado é `|dr + t dv|²`, uma parábola **convexa** em `t`, com mínimo em
+> # REVISÃO NORMATIVA (f) — 2026-08-09. O MODELO DE COLISÃO FOI REFEITO.
+>
+> Esta revisão substitui o núcleo das Seções 4.3 a 4.10. Ela não é um ajuste de valores: **três
+> afirmações que este documento publicava como demonstradas são falsas**, e cada uma delas está
+> registrada no lugar onde foi escrita, com a medição que a derruba. Índice da revisão:
+>
+> | onde | o que muda |
+> |---|---|
+> | **4.3** | detecção no **primeiro contato** `t_c` (menor raiz de `\|sep\|² = R²`), não em `t*` |
+> | **4.5** | registro de que a afirmação `u . n < 0` em `t*` era **FALSA**, e de que 4.5 e 4.9 se **contradiziam** |
+> | **4.6** | **portões físicos determinísticos** substituem `x`, `v_coh` e o mapa de probabilidades |
+> | 4.6-H, 4.7, 4.7.1, 4.8 | **APOSENTADAS**, preservadas como registro |
+> | **4.9** | três canais: **fusão**, **ricochete com restituição `e < 1`**, **erosão** |
+> | **4.10** | uma regra única `E_int += -(ΔK + ΔU)` com `ΔU` **exato**, incluindo o campo |
+> | 6 | `INV-25`, `INV-26` aposentados; `INV-32` reescrito; `INV-33` a `INV-38` novos |
+>
+> **Os seis defeitos que a motivaram, todos medidos, nenhum hipotético:**
+>
+> 1. **O impulso elástico era identicamente nulo.** `t*` é o mínimo interior de `\|sep(t)\|²`, onde
+>    `d/dt \|sep\|² = 2 sep . dv = 0` **por definição de mínimo**; logo `u . n = 0` e
+>    `J = 2 mu (u.n) n = 0` **exatamente**. Medido `\|cos(u,n)\| <= 5.4e-6` em `8258` casos
+>    interiores **[M]**, e reproduzido aqui em `2e4` configurações aleatórias com máximo
+>    `3.2e-16` **[M]**. O canal elástico não era elástico: era a identidade. Na linha de base
+>    `N = 600`, `21%` dos eventos caíam no caso interior **[M]**.
+> 2. **O mapa de regime vivia na cauda de fragmentação.** `x = \|u\|²/v_coh²` com
+>    `v_coh = V_CHAR = 3.28 m/s`, a escala virial **global**, contra encontros de `12` a `24 m/s`
+>    medidos **no núcleo colapsado**: `x ~ 13` a `53`, `p_frag ~ 0.81` a `0.95` **[M]**.
+> 3. **A fragmentação ignorava os corpos que colidiram.** `f ~ U[0.1, 0.9]` sobre a massa
+>    **combinada**, com razões de massa medidas até `949:1` **[M]**.
+> 4. **Fragmentava onde não havia energia.** `T_cm < E_lig` do corpo maior em `75.4%` dos eventos;
+>    abaixo de `1% E_lig` em `26.3%` **[M]**.
+> 5. **Os fragmentos eram teletransportados, e a Seção 4.5 proíbe isso.** Recolocados à separação
+>    `R_a + R_b` das massas **novas**, até `1.44x` a separação real **[M]**, e saindo **mais devagar**
+>    do que chegaram em `65.8%` dos casos, até `0.065x` **[M]**.
+> 6. **`E_total` não era conservada por construção.** `E_int` contabilizava só os termos do próprio
+>    par. Medido `N = 600`, `62` eventos: resíduo não absorvido `8.5602%` de `\|E_0\|` acumulado,
+>    `0.9350%` no pior passe, e **`62` de `62` eventos vazam** — não há um único evento em que a
+>    conservação alegada pela Seção 4.10 se sustente **[M]**.
+>
+> **Também medido na mesma linha de base, e é a transmutação quantificada:** o maior salto relativo
+> de massa num slot **vivo** foi **`1.207`** — a massa de um corpo vivo muda `121%` num único passo,
+> sem que nada de visível aconteça com ele na tela **[M]**.
+
+Sobre um passo `[0, h]`, com `dr = r_j - r_i` e `dv = v_j - v_i = u` constantes (movimento
+retilíneo), a separação ao quadrado `|dr + t dv|²` é uma parábola **convexa** em `t`. A versão
+anterior resolvia a colisão no **mínimo** dessa parábola; esta resolve na **primeira raiz** de
 
 ```
-t* = clamp( - (dr . dv) / |dv|^2 ,  0 ,  h )
+q(t) := |dr + t dv|^2 - R^2 = a t^2 + b t + c  =  0
+
+    a = |dv|^2        b = 2 (dr . dv)        c = |dr|^2 - R^2        R = R_i + R_j
 ```
 
-**Verificação: a fórmula está correta.** Derivando, `d/dt |dr + t dv|² = 2 (dr + t dv) . dv = 0` dá
-`t = -(dr.dv)/|dv|²`; convexidade garante que o clamp a `[0,h]` devolve o mínimo **sobre o
-intervalo**, não um extremo espúrio. **[T]** Verificado numericamente contra minimização por grade
-de `2e6` pontos em 5 configurações aleatórias: coincidência exata em `t*` e no valor do mínimo, em
-todos os casos, inclusive nos dois em que o clamp foi ativado. **[M]**
+**Forma normativa da raiz — a canônica é proibida.** Com a guarda de aproximação `dr . dv < 0`
+tem-se `b < 0`, e a menor raiz na forma canônica `(-b - sqrt(D))/(2a)` é a diferença de dois
+positivos quase iguais sempre que `4ac << b²` — que é o caso de todo encontro rápido, exatamente
+onde o detector precisa ser confiável. A forma estável é a racionalizada:
 
-Colide se `|dr + t* dv| < R_i + R_j`.
+```
+D   = b*b - 4*a*c
+t_c = 2*c / ( -b + sqrt(D) )
+```
+
+Aqui `-b > 0` e `sqrt(D) > 0`, de modo que o denominador é uma **soma** de positivos e não há
+cancelamento algum. **[T]**
+
+**Guardas de aceitação, todas obrigatórias e nesta ordem:**
+
+```
+1.  a > 0                  (|dv|^2 != 0)          -- senao o par nao se move um em relacao ao outro
+2.  dr . dv < 0            (aproximando-se)       -- guarda de aproximacao, ESTRITA, inalterada
+3.  c <= 0                 -> t_c = 0             -- ja sobreposto no inicio do passo; NAO avaliar D
+4.  c >  0 e D > 0         -> t_c = 2c/(-b+sqrt(D))
+5.  0 <= t_c <= h                                 -- o contato cai dentro deste passo
+```
+
+O ramo `3` é o caso de sobreposição residual — possível após uma fusão, que aumenta o raio de
+contato do corpo resultante. Resolvê-lo em `t_c = 0`, na configuração corrente, com a guarda de
+aproximação decidindo, é **literalmente o que o veto da Seção 4.5 prescreve** para esse caso
+(*"a correção obrigatória não é reposicionar: é aplicar a guarda de aproximação e deixar a dinâmica
+separar os corpos"*). O veto passa a ser **satisfeito** onde antes era violado.
+
+**O conjunto de eventos é preservado. Demonstração.** Seja `t_min = -b/(2a) > 0` (positivo pela
+guarda `2`). **[T]**
+
+- Se `c <= 0`: `q(0) <= 0`, o par já está em contato. O teste antigo (`q(t*) < 0` com
+  `t* = clamp(t_min, 0, h)`) aceita, porque `q(t*) <= q(0) <= 0`. O novo aceita por `t_c = 0`.
+- Se `c > 0` e `t_min <= h`: o teste antigo é `q(t_min) < 0`, isto é `D > 0`. Isso é **exatamente**
+  a condição do novo teste, e então `0 < t_c < t_min <= h`, logo `t_c ∈ [0, h]`.
+- Se `c > 0` e `t_min > h`: o teste antigo é `q(h) < 0`. Como `q(0) = c > 0`, existe raiz em
+  `(0, h)`, que é `t_c`; e a raiz maior excede `t_min > h`. Reciprocamente `t_c ∈ (0, h]` implica
+  `q(h) <= 0`. Os dois testes coincidem, exceto na borda de medida nula `q(h) = 0`.
+
+**Nenhum evento se perde, e o argumento anti-tunelamento da Seção 4.4.2 sobrevive intacto**, porque
+ele é sobre a monotonicidade de `dr . dv` no passo, que não foi tocada. `|sep(t*)| < R` e "o
+segmento entra na esfera" são a mesma condição; o que mudou é **o instante em que se resolve**, que
+passa do fundo do poço para a entrada.
+
+**O que a mudança compra, e é o ponto todo:** em `t_c` a separação é `|sep| = R` (ramo `4`) ou
+`|dr|` (ramo `3`), e em ambos os casos
+
+```
+u . n  <  0     ESTRITAMENTE
+```
+
+porque `q'(t_c) = 2 a t_c + b < 0` para `t_c < t_min` (ramo `4`, garantido por `D > 0` estrito), e
+`q'(0)/2 = dr . dv < 0` pela guarda (ramo `3`). E `q'(t)/2 = sep . dv`, logo `sep . u < 0`, logo
+`n . u < 0`. **[T]** É esta desigualdade — falsa em `t*`, verdadeira em `t_c` — que faz o impulso
+existir, que faz o ricochete separar o par, e que torna verdadeira a afirmação da Seção 4.5 que era
+falsa.
+
+**Segunda propriedade, igualmente decisiva:** em `t_c`, `n` é **paralela a `dr(t_c)`** por
+construção (`n = sep/|sep|` e `sep = dr(t_c)`). Em `t*` isso também valia, mas com `u` ortogonal a
+`n`; agora vale com `u . n < 0`. Consequências, todas usadas na Seção 4.9: o impulso de ricochete é
+central, logo conserva `L` **exatamente**; e o momento angular interno de saída é um múltiplo
+escalar de `dr x u`, logo `ΔL` tem **forma fechada** em todos os canais.
+
+**`D > 0` é estrita, e por quê.** `D = 0` é a tangência rasante, onde `u . n = 0` e o impulso é nulo
+— o mesmo degenerescimento que este defeito tinha em toda parte. É um conjunto de medida nula;
+excluí-lo custa um `>` e remove o único ponto em que o novo esquema reproduziria o antigo.
 
 **Casos degenerados, normativos:**
 
-- `|dv|² == 0`: adotar `t* = 0`. Sem esta guarda há divisão por zero. Ocorre exatamente quando as
-  duas partículas têm velocidade idêntica bit a bit — raro, mas produzido de propósito por qualquer
-  teste com condição inicial simétrica.
-- **Guarda de aproximação:** o par só é candidato se `dr . dv < 0` no **início** do passo (isto é,
-  aproximando-se). Sem essa guarda, um par que acabou de colidir e ainda está sobreposto dispara de
-  novo no passo seguinte, produzindo colisões "pegajosas" — o artefato mais comum de detectores de
-  contato ingênuos.
+- `a == 0` (`|dv|² == 0`): **não é candidato**. Com `dv = 0` tem-se `dr . dv = 0`, que já reprova a
+  guarda `2`, que é estrita. Nenhuma divisão por zero é alcançada. Ocorre exatamente quando as duas
+  partículas têm velocidade idêntica bit a bit — raro, mas produzido de propósito por qualquer teste
+  com condição inicial simétrica.
+- **Guarda de aproximação:** o par só é candidato se `dr . dv < 0` no **início** do passo. Sem essa
+  guarda, um par que acabou de colidir e ainda está sobreposto dispara de novo no passo seguinte,
+  produzindo colisões "pegajosas" — o artefato mais comum de detectores de contato ingênuos. Ela é
+  também, agora, o **único** mecanismo que impede a recolisão imediata: nenhum reposicionamento a
+  substitui.
+- `|dr| == 0` **e** `c <= 0` (corpos exatamente coincidentes): a normal é `0/0`. Vale a regra de
+  extensão contínua da Seção 4.9(0.1), inalterada. Note que a detecção no primeiro contato
+  **remove** o caso frontal colinear dessa lista — ali `|sep| = R > 0` — de modo que o ramo
+  degenerado passa a ser alcançável apenas por coincidência exata de posições.
+
+**Cancelamento em `c = |dr|² - R²`.** Quando `|dr| ≈ R` os dois termos se cancelam e `c` perde
+dígitos. É inofensivo: `c` pequeno significa `t_c ≈ 0`, e o erro absoluto em `t_c` é da ordem do
+erro absoluto em `c` dividido por `|b|`, isto é, uma fração de ulp do passo. **[T]** Nenhuma guarda
+adicional é necessária, e um limiar aqui trocaria uma raiz boa por um ramo pior — o mesmo argumento
+da Seção 4.9(0.1).
 
 **A hipótese de movimento retilíneo é exata para o *drift* do Verlet.** No esquema KDK a atualização
 de posição é `r^(n+1) = r^n + h v^(n+1/2)` com `v^(n+1/2)` constante ao longo do subpasso. Se `dv`
@@ -1138,6 +1256,43 @@ com execuções não colisionais direta em vez de aproximada.
 
 ### 4.5 Onde a colisão entra no passo, e pareamento disjunto
 
+> # REGISTRO DE ERRO — 2026-08-09 (f). DUAS FALHAS DESTE DOCUMENTO, NÃO DA IMPLEMENTAÇÃO.
+>
+> **(i) Uma afirmação falsa, publicada como premissa de uma construção.** A Seção 4.9(3) escrevia,
+> para justificar que os fragmentos saíam se afastando:
+>
+> > *"`n` aponta de `i` para `j` e o par está se aproximando em `t*` (`u . n < 0`), logo `u'` com
+> > sinal `+n` é separação"*
+>
+> **Isso é falso, e é falso pela própria definição de `t*`.** No mínimo interior da parábola
+> `|sep(t)|²` vale `d/dt |sep|² = 2 sep . dv = 0`, isto é `sep . u = 0` **exatamente**, portanto
+> `u . n = 0` e não `u . n < 0`. A desigualdade só valia quando `t*` era **grampeado na borda** do
+> passo. Medido: `|cos(u,n)| <= 5.4e-6` em `8258` casos interiores **[M]**.
+>
+> As consequências não eram retóricas. `J = 2 mu (u.n) n = 0`: **o canal elástico era a identidade**
+> em todo evento resolvido no interior do passo. E na fragmentação, `u'` alinhado com `n` saía
+> **perpendicular** à velocidade relativa de chegada, e não ao longo do eixo do impacto como o texto
+> afirmava — de modo que a frase *"fragmentos saindo ao longo do eixo do impacto é fisicamente mais
+> razoável que isotrópico"* descrevia uma construção que fazia o oposto do que ela dizia.
+>
+> **(ii) Uma contradição interna entre duas seções normativas.** Esta seção declarava:
+>
+> > *"Nenhuma sobreposição residual é produzida... Isso torna desnecessário — e **proibido** —
+> > qualquer reposicionamento *ad hoc*."*
+>
+> e a Seção 4.9(3) **executava exatamente esse reposicionamento**, colocando os fragmentos a
+> `R_a + R_b` das massas novas, até `1.44x` a separação real do par **[M]**. A Seção 4.9.1 chegou a
+> registrar a tensão (*"a fragmentação é o único canal que faz exatamente isso"*) e a resolveu
+> declarando que o `ΔU` era contabilizado — o que **não responde à proibição**, que era sobre
+> deslocar posições, não sobre contabilizar energia. Duas seções normativas do mesmo documento
+> mandavam coisas opostas, e a implementação seguiu a que estava escrita como código.
+>
+> **Estatuto após a revisão (f):** a proibição fica **em vigor e passa a ser cumprida**. Nenhum canal
+> reposiciona corpo algum. O que substitui o reposicionamento é a garantia de separação da
+> Seção 4.9 (`u' . n > 0` em todo canal que deixa dois corpos vivos), somada à guarda de aproximação
+> desta seção. **Não é o mesmo que ausência de sobreposição** — ver `INV-35`, que enuncia o que de
+> fato é verdadeiro em vez do que se desejava que fosse.
+
 **Esquema normativo.** A colisão é inserida **dentro do *drift*** do Verlet, não após o passo:
 
 ```
@@ -1147,20 +1302,33 @@ a^(n+1)              = A(r^(n+1), m)
 v^(n+1)              = v^(n+1/2) + (h/2) a^(n+1)
 ```
 
-O passe `C_h` faz, nesta ordem:
+O passe `C_h` faz, nesta ordem **[revisado em 2026-08-09 (f): `t*` -> `t_c`, e o item 3 ganha uma
+cláusula de estado corrente que a versão anterior não tinha e de que a Seção 4.10 precisa]**:
 
-1. **Detecção.** Para todo par, `t*` e teste de contato da Seção 4.3, com `dv = v^(n+1/2)`.
-2. **Ordenação e aceitação gulosa.** Ordenar os candidatos pela chave lexicográfica `(t*, i, j)`.
+1. **Detecção.** Para todo par, `t_c` e guardas da Seção 4.3, com `dv = v^(n+1/2)`.
+2. **Ordenação e aceitação gulosa.** Ordenar os candidatos pela chave lexicográfica `(t_c, i, j)`.
    Percorrer em ordem, aceitando o par se **nenhum** dos dois já foi reivindicado neste passe.
-3. **Resolução.** Para cada par aceito: avançar **os dois participantes** de `t*` (movimento
-   retilíneo), aplicar o mapa de desfecho ali, e avançar os corpos resultantes o restante `h - t*`.
-4. **Drift simples.** Todos os não participantes recebem `r <- r + h v`.
+3. **Resolução, sobre o estado CORRENTE do passe.** Manter por slot a tripla
+   `(r_ref, v, m, t_ref)`, com `t_ref = 0` no início, de modo que a posição do slot `k` num instante
+   `t` é `r_ref_k + (t - t_ref_k) v_k`. Para cada par aceito, **na ordem de `(t_c, i, j)`**: avaliar
+   as posições de **todos** os slots em `t_c` por essa regra, aplicar o mapa de desfecho da
+   Seção 4.9 e a contabilidade da Seção 4.10 ali, e gravar `r_ref <- posição em t_c`,
+   `t_ref <- t_c` para os dois participantes.
+4. **Drift final.** Ao fim do passe, todo slot recebe `r <- r_ref + (h - t_ref) v`. Para os não
+   participantes isso é `r <- r + h v`, idêntico ao drift simples.
+
+**Por que o item 3 tem de ver o estado corrente.** Os pares aceitos são disjuntos em **slots**, mas
+não em **influência**: o `ΔU` de campo do evento `k` (Seção 4.10) soma sobre os outros `N-2` corpos,
+e alguns deles podem ter tido massa ou posição alteradas por um evento anterior **deste mesmo
+passe**. Avaliar o evento `k` contra o estado de início de passo faria a contabilidade de energia
+errar por esse termo. Com a regra acima o passe fica exato, e o custo é `O(N)` por evento — o mesmo
+que a soma de campo já custa. **[T]**
 
 Por que **dentro** do drift e não depois do passo:
 
-- O impulso é aplicado **na configuração de contato**, com a normal `n = (dr + t* dv)/|dr + t* dv|`
+- O impulso é aplicado **na configuração de contato**, com a normal `n = (dr + t_c dv)/|dr + t_c dv|`
   paralela à separação real no ponto de aplicação. **É essa paralelidade, e só ela, que faz o
-  choque elástico conservar `L` exatamente** (Seção 4.8). Aplicar o impulso no fim do passo com a
+  ricochete conservar `L` exatamente** (Seção 4.9). Aplicar o impulso no fim do passo com a
   normal de contato destrói a conservação de `L`; aplicar com a normal de fim de passo a preserva
   mas perde a colisão sempre que houver tunelamento (4.4).
 - Nenhuma sobreposição residual é produzida: os corpos são separados pela própria dinâmica após
@@ -1239,7 +1407,195 @@ declarar que a sequência de eventos é uma aproximação grosseira. Nenhum test
 em ponto flutuante. Sem isso, a ordem de aceitação depende da estabilidade do algoritmo de ordenação
 e o resultado deixa de ser reprodutível entre dispositivos. Normativo.
 
-### 4.6 Parâmetro de regime `x`
+### 4.6 Portões determinísticos de desfecho — NORMATIVO desde 2026-08-09 (f)
+
+O desfecho **deixa de ser sorteado**. Ele é decidido por duas desigualdades sobre as grandezas do
+próprio par, avaliadas em `t_c`. Não há mapa de probabilidades, não há `x`, não há `v_coh`, e o
+fluxo de números aleatórios de colisão **não é consumido em canal algum** (Seção 4.7.1, reescrita).
+
+**Notação, toda avaliada em `t_c` (Seção 4.3):**
+
+```
+i, j       os dois slots, com i < j pela regra de aceitacao da Sec. 4.5
+m_G, m_P   massa do corpo MAIOR (G) e do MENOR (P) do par;  empate -> G e' o de indice menor
+R_G, R_P   raios de contato R = R_ref (m/m_bar)^(1/3)  (Sec. 4.1)
+M   = m_i + m_j            mu = m_i m_j / M
+R   = R_i + R_j
+sep = dr + t_c dv          d_c = |sep|          n = sep / d_c        (Sec. 4.9(0.1) no degenerado)
+u   = v_j - v_i            u_n = u . n  ( < 0 ESTRITAMENTE, Sec. 4.3 )
+T_cm = (1/2) mu |u|^2      T_n = (1/2) mu u_n^2      ( 0 < T_n <= T_cm )
+d~_c = sqrt( d_c^2 + eps^2 )                          (distancia SUAVIZADA de contato)
+```
+
+**Os dois portões, na ordem de avaliação, que é normativa:**
+
+```
+PORTAO 1 (FUSAO).       |u| < v_esc := sqrt( 2 G M / d~_c )
+                        equivalente a  T_cm < G m_i m_j / d~_c ,  isto e  E_rel < 0
+
+PORTAO 2 (EROSAO).      T_n > E_lig := K_BIND * G m_P^2 / R_P          (K_BIND = 3/5)
+
+senao                   RICOCHETE
+```
+
+#### 4.6.1 Correção obrigatória à proposta: `v_esc` usa a distância SUAVIZADA
+
+A proposta submetida a esta seção usava `v_esc = sqrt(2 G M / R)`, com `R = R_i + R_j` newtoniano, e
+pedia confirmação de que misturar isso com a contabilidade suavizada de `E_int` era coerente.
+**Não é. O portão 1 está corrigido, e a correção não é cosmética.**
+
+O portão 1 afirma uma coisa sobre a **dinâmica subsequente do par dentro desta simulação**: *"o par
+fica ligado após o contato"*. A dinâmica desta simulação é governada pelo potencial de Plummer, não
+pelo newtoniano — é o que a Seção 4.2 já registrava (`R_i + R_j` é **cinco vezes menor** que `eps`
+em `chi = 0.1`, logo **todo contato ocorre dentro da região regularizada**). Um critério de ligação
+escrito com `1/R` mede a ligação de um sistema que não é o que se integra. Quantificado, para o par
+`m_bar`–`m_bar` **[T]**:
+
+| forma | `v_esc` | leitura |
+|---|---|---|
+| newtoniana, `2GM/R` | `5.1668 m/s` | a ligação de um par que esta simulação **não** integra |
+| suavizada, `2GM/sqrt(R²+eps²)` | **`2.2881 m/s`** | a ligação do par que ela **de fato** integra |
+
+Fator `2.258` em velocidade, `5.099` em energia. Não é margem de tolerância: com a forma newtoniana,
+um encontro típico do núcleo (`|u| = 4.64 m/s` **[M]**) seria declarado **ligado** quando é, no
+potencial que a simulação resolve, **livre por um fator `2` em velocidade**. A fusão então fabricaria
+um corpo ligado a partir de um par livre, e a diferença apareceria como energia em `E_int` sem
+violar conservação nenhuma — mas o **rótulo** do canal seria falso, e é o rótulo que a prosa do
+relatório usa.
+
+**`E_lig`, ao contrário, é e continua newtoniano**, e a assimetria é a resposta à pergunta feita:
+`E_lig` **não é** uma afirmação sobre a dinâmica desta simulação. É uma propriedade de estrutura
+interna, importada de um modelo (esfera autogravitante uniforme) que este modelo não contém. Ela
+nunca entra no hamiltoniano, nunca é integrada, e o softening — que é uma propriedade do **campo**
+entre corpos — não tem o que dizer sobre a coesão **dentro** de um corpo.
+
+**Regra geral, normativa, para não repetir o erro:** *toda grandeza que decide o que os corpos
+farão em seguida usa `d~ = sqrt(d² + eps²)`; toda grandeza que descreve o que os corpos são usa a
+distância newtoniana.* `v_esc` é do primeiro tipo. `E_lig` é do segundo.
+
+#### 4.6.2 Ressalva de escopo sobre `E_lig` — a do `fragmentation_probe.py` NÃO basta
+
+`scripts/fragmentation_probe.py` já declara que os corpos são massas pontuais sem estrutura interna
+e que `E_lig` é importada de fora do modelo. Essa ressalva bastava **enquanto `E_lig` era uma régua
+de diagnóstico**. Ela **não basta agora**, porque `E_lig` passou a ser um **portão**: decide
+desfechos, e portanto entra no resultado. Três exigências substituem a ressalva:
+
+1. **O coeficiente é explícito e configurável.** Escrever `E_lig = K_BIND * G m_P² / R_P` com
+   `K_BIND = 3/5` como **valor padrão declarado**, e não `3/5` embutido na fórmula. `3/5` é a
+   energia de ligação gravitacional de uma esfera **uniforme**; qualquer outro perfil dá outro
+   coeficiente, e o modelo não tem perfil nenhum. É um parâmetro, e tem de parecer um.
+2. **O `R` de `E_lig` não é raio de corpo.** É `R_ref (m/m_bar)^(1/3)` com `R_ref = chi * eps`, um
+   parâmetro de **seção de choque**, escolhido em `chi = 0.1` por razões de taxa de encontro
+   (Seção 4.1.1) e por nenhuma razão de coesão. Consequência aritmética direta: o nível absoluto do
+   portão 2 escala com `1/chi`, isto é, **`chi = 0.1` torna `E_lig` dez vezes maior do que
+   `chi = 1` a tornaria**. O limiar de erosão herda uma calibração feita para outra grandeza.
+   **[A]** — não há medição neste projeto que o feche, e não se pretende produzir uma.
+3. **Proibição de asserção, herdada e endurecida.** É permitido escrever *"sob o portão fixado na
+   Seção 4.6, `X%` dos contatos erodiram o projétil"*. É **proibido** escrever qualquer coisa sobre
+   limiares de disrupção, sobre resistência de corpos, ou sobre a energia específica de fragmentação
+   de material algum. O limite de escopo da Seção 4.9.1 vale integralmente e agora também para o
+   portão.
+
+#### 4.6.3 Os portões NÃO são mutuamente exclusivos, e por isso a ordem é normativa
+
+A proposta submetida afirmava exclusividade. **Ela vale para `q` pequeno e falha para `q` grande.**
+Com `q = m_G/m_P` e o menor corpo em `m_bar` **[T]**:
+
+| `q` | `E_lig(P) / E_esc` | veredito |
+|---|---|---|
+| `1` | `6.1188` | exclusivos |
+| `2` | `3.0757` | exclusivos |
+| `4` | `1.5494` | exclusivos |
+| `6` | `1.0389` | exclusivos |
+| **`6.237`** | **`1.0000`** | **fronteira** |
+| `8` | `0.7830` | **SOBREPOSTOS** |
+| `20` | `0.3200` | **SOBREPOSTOS** |
+
+A condição fechada é `E_lig(P) < E_esc  <=>  q > K_BIND * d~_c / R_P`. Acima de `q ≈ 6` um encontro
+**lento** e **muito desigual** satisfaz os dois portões ao mesmo tempo: o par fica ligado **e** o
+projétil está muito acima do seu próprio limiar de disrupção. Medido na população real de contatos,
+os dois portões disparam juntos em **`2.3%`** dos eventos no colapso frio e **`12.3%`** no espectro
+de Salpeter **[M]**.
+
+**A ordem resolve a sobreposição, e a precedência da fusão é a resposta fisicamente certa:** se o par
+termina ligado, ele termina como um corpo só, **independentemente** de o projétil ter se estilhaçado
+no processo — os cacos ficam ligados ao alvo. Erodir um par que vai ficar ligado seria contabilizar
+uma disrupção cujo produto reacreta no passo seguinte. **A cascata é: portão 1, depois portão 2,
+depois ricochete. Normativo.**
+
+#### 4.6.4 O que esta revisão REINTRODUZ, dito antes de qualquer resultado
+
+Adotar portões físicos **reintroduz a escala de velocidade de escape local ao par** — exatamente o
+termo `v_esc_eff` que a revisão (b) de 2026-08-07 retirou da Seção 4.6-H, e exatamente a substituição
+que a caixa final da Seção 4.9.1 **vetou**, com o argumento de que `v_esc` cresce sem cota com a
+massa enquanto `|u|` é limitada pela dinâmica do aglomerado, de modo que corpos grandes fundem cada
+vez mais. **O veto está RETRATADO. O mecanismo que ele descrevia é real e continua real** — medido
+aqui **[T]**:
+
+| `m_G` | `d~_c` | `v_esc` (suavizada) |
+|---|---|---|
+| `1 m_bar` | `5.099e-2` | `2.2881 m/s` |
+| `10 m_bar` | `5.243e-2` | `5.2920 m/s` |
+| `100 m_bar` | `5.741e-2` | `15.3244 m/s` |
+| `1000 m_bar` | `7.433e-2` | `42.3979 m/s` |
+| `10000 m_bar` | `1.233e-1` | `104.0465 m/s` |
+
+**Três coisas são verdadeiras ao mesmo tempo, e o documento tem de sustentar as três:**
+
+1. O veto de 4.9.1 estava **tecnicamente certo** sobre a consequência: com `v_esc` local, `p_fus` de
+   um corpo grande tende a `1`, o canal de fusão é `2 -> 1`, `N` cai monotonicamente, e há **estado
+   absorvente**. Isso não foi refutado e não está sendo negado.
+2. O veto estava **errado sobre o que fazer com isso**. Ele preferia um critério que era
+   *dimensionalmente certo e localmente errado* — a própria Seção 4.9.1 escreveu essa frase sobre
+   `v_coh`, e depois manteve `v_coh`. Um critério de ligação que **não olha o par** não é um critério
+   de ligação; é uma escala global vestida de uma. Trocar a resposta certa pela resposta conveniente
+   porque a certa produz um resultado indesejado é o ajuste post-hoc que este documento proíbe, com
+   o sinal invertido.
+3. A decisão do projeto sobre o runaway **já foi tomada**, na Seção 4.13.5: parar de modelar contra
+   ele e **aceitá-lo como resultado**. Uma vez tomada essa decisão, o argumento "isto causa runaway"
+   deixa de ser motivo para rejeitar um critério correto.
+
+**Alavanca autorizada, declarada ANTES do próximo resultado, e é a única:** se a fusão se mostrar
+excessiva a ponto de o visualizador terminar com poucos corpos, a correção autorizada é **elevar
+`chi`** — o que aumenta `R`, aumenta `d~_c` e **reduz** `v_esc` — e não introduzir fator algum no
+portão. `chi` já é um parâmetro do projeto com significado declarado. Nenhuma outra alavanca é
+autorizada, em particular nenhum coeficiente multiplicando `v_esc`.
+
+#### 4.6.5 Predição falsificável, registrada ANTES da execução
+
+Reclassificando os contatos **já registrados** (`results/2026/fragmentation_probe_*.csv`) pelos
+portões novos, com `u_n` amostrado por parâmetro de impacto uniforme no disco de raio `R` (que é a
+distribuição correta para o primeiro contato) **[T]/[M]**:
+
+| população | fusão | ricochete | erosão | ambos os portões |
+|---|---|---|---|---|
+| espectro Salpeter, `Q = Q_DEFAULT` | `45.6%` | `8.8%` | `45.6%` | `12.3%` |
+| frio, massas iguais, `Q = 0` | `19.2%` | `21.3%` | `59.5%` | `2.3%` |
+
+**Predição:** na execução com o modelo novo, os três canais ficam **todos** acima de `5%` nas duas
+condições iniciais, e a ordenação `erosão >= fusão > ricochete` se mantém no espectro de Salpeter.
+**Esta é uma predição fraca de propósito**, porque a população acima foi gerada por um modelo
+diferente — a trajetória muda assim que os desfechos mudam. O que ela **não** pode fazer é prever
+frações; o que ela **pode** fazer é falhar, se algum canal ficar vazio. **[A]**
+
+**Estatuto epistêmico dos portões, dito sem rodeios e substituindo o da Seção 4.8.** Os portões
+são **critérios de energia**, não uma teoria de colisões. O portão 1 é exato dentro do modelo: é a
+condição de ligação do par no potencial que a simulação integra, sem parâmetro nenhum. O portão 2
+é **fenomenológico e importado**: `K_BIND`, `R_P` e a própria noção de coesão vêm de fora
+(Seção 4.6.2). Consequência normativa para o relatório: **as frações de canal realizadas são uma
+saída dos portões, jamais uma predição física.**
+
+### 4.6-H `[HISTÓRICO — APOSENTADO em 2026-08-09 (f)]` Parâmetro de regime `x`
+
+> **APOSENTADA.** `x`, `v_coh`, `v_coh_from_state()`, `CollisionModel.v_coh` e `COH_VELOCITY_FACTOR`
+> deixam de ser símbolos deste projeto. O conteúdo abaixo é preservado **como registro**, e não como
+> norma: ele documenta duas retratações reais (a do termo gravitacional em 2026-08-07 (b) e a da
+> ressalva sobre corpos massudos) que continuam informando a Seção 4.6.4. **O defeito que o
+> aposentou é o `2` da caixa da Seção 4.3:** `v_coh = V_CHAR = 3.28 m/s` é a escala virial **global**
+> do aglomerado, enquanto os contatos ocorrem no núcleo colapsado, a `12`–`24 m/s` medidos — logo
+> `x ~ 13` a `53` e `p_frag ~ 0.81` a `0.95` **[M]**. O mapa passava a vida inteira numa ponta da sua
+> própria escala. A Seção 4.9.1 já havia diagnosticado a causa em uma frase — *"o critério tem a
+> dimensão certa e a **localidade errada**"* — e mantido o critério assim mesmo.
 
 O desfecho não é sorteado uniformemente: é enviesado por um parâmetro adimensional que compara a
 energia do impacto com a energia que mantém o par unido.
@@ -1249,7 +1605,7 @@ energia do impacto com a energia que mantém o par unido.
 > A versão anterior desta seção **vetava** omitir o termo gravitacional de `E_bind`, com três
 > argumentos. **O veto está RETRATADO: os três argumentos estavam errados, e o terceiro estava
 > exatamente invertido.** O termo gravitacional não regulava o crescimento descontrolado — **ele o
-> causava.** A execução do estágio 3 o demonstrou (Seção 4.13.2), e a Seção 4.6.1 mostra por quê.
+> causava.** A execução do estágio 3 o demonstrou (Seção 4.13.2), e a Seção 4.6-H.1 mostra por quê.
 >
 > Consequência: **o item 6 do PISO (Seção 4.14) está retirado**, e `v_esc_eff` deixa de existir.
 
@@ -1266,7 +1622,7 @@ x := T_cm / E_bind  =  |u|^2 / v_coh^2                                          
 velocidade relativa no contato**, e de nenhuma propriedade dos corpos. Uma divisão. Nada de `R_sum`,
 nada de `eps`, nada de raiz quadrada.
 
-#### 4.6.1 Por que os três argumentos a favor do termo gravitacional estavam errados
+#### 4.6-H.1 Por que os três argumentos a favor do termo gravitacional estavam errados
 
 **Argumento (1), refutado: "sem ele, `x >= 1` identicamente e a fusão fica inalcançável".**
 
@@ -1331,7 +1687,7 @@ que o problema já tem, já é computada por `scales_from_state`, e não custa n
 **A energia de coesão é agora a ÚNICA escala de `E_bind`, e é a forma mais simples possível dela.**
 Com o termo gravitacional retirado, `v_coh` sozinho fixa a escala, e ele não tem parâmetro.
 
-#### 4.6.2 A alavanca pré-declarada NÃO resolvia isto — e por que a troca não é ajuste post-hoc
+#### 4.6-H.2 A alavanca pré-declarada NÃO resolvia isto — e por que a troca não é ajuste post-hoc
 
 Este documento declarou, **antes de qualquer resultado**, que a única alavanca autorizada seria
 elevar `v_coh` acima de `V_CHAR`. É necessário dizer com franqueza o que ela faz e o que não faz.
@@ -1355,7 +1711,7 @@ certa caso o mecanismo fosse conhecido antes. As duas condições se verificam:
 - A causa identificada é a **dependência de `x` com a massa**, via `v_esc_eff`. A correção adotada —
   retirar `v_esc_eff` — é exatamente a remoção dessa dependência, e não um ajuste de nível.
 - Se soubéssemos, ao escrever a Seção 4.6, que o par chega ao contato com apenas `~40%` da energia
-  de queda desde o infinito (Seção 4.6.1), **o termo nunca teria sido posto lá**: ele foi introduzido
+  de queda desde o infinito (Seção 4.6-H.1), **o termo nunca teria sido posto lá**: ele foi introduzido
   para corrigir um piso `x >= 1` que nunca existiu. A correção não é uma alavanca nova; é a
   **retirada de um erro**.
 - A correção **reduz** complexidade: apaga `v_esc_eff`, uma raiz quadrada e uma soma por evento, e
@@ -1367,7 +1723,17 @@ reprovar **por falta** de fusão, elevar `v_coh` acima de `V_CHAR`. Se reprovar 
 reduzir `v_coh` abaixo de `V_CHAR`. Em ambos os casos `x = |u|²/v_coh²` desloca-se uniformemente e
 **sem** reintroduzir dependência com a massa. Nenhuma outra alavanca é autorizada.
 
-### 4.7 O mapa `x -> (p_fus, p_el, p_frag)` — sem parâmetro livre
+### 4.7 `[HISTÓRICO — APOSENTADO em 2026-08-09 (f)]` O mapa `x -> (p_fus, p_el, p_frag)`
+
+> **APOSENTADA.** `regime_probabilities()`, `MAP_ELASTIC_WEIGHT` e `MAP_X_CLAMP` deixam de ser
+> símbolos deste projeto, e `INV-25` e `INV-26` estão aposentados com eles (Seção 6). O mapa
+> `(1/x, 3, x)/Z` é internamente impecável — soma `1`, é monótono, é simétrico sob `x -> 1/x`, é
+> seguro em fp32 — e nada disso importa quando a **entrada** está na cauda: com `x ~ 13`–`53` no
+> núcleo, `p_frag ~ 0.81`–`0.95` **[M]**, e um mapa de três canais que entrega um só não é um mapa.
+> Preservado como registro. **Lição transferível, no espírito das que este documento já registra:
+> a boa formação de um mapa é uma propriedade dele; a sua utilidade é uma propriedade da
+> distribuição de entrada, e as duas foram testadas com desproporção — `INV-25` cobria a primeira
+> com oito cláusulas e nada cobria a segunda.**
 
 > **REVISÃO NORMATIVA 2026-08-07.** A versão anterior usava um softmax sobre escores lineares em
 > `ln x`, com dois parâmetros de forma (`b`, `w`), um `clamp` em `±30 w`, avaliação obrigatória por
@@ -1440,7 +1806,29 @@ até favorável ao critério de não degenerescência da Seção 4.13 — menos 
 terminar em poucos corpos. O custo é que o canal de fusão fica mais próximo do piso de `5%` de
 `INV-31(C5)`; a alavanca declarada, se ele reprovar, é `v_coh` (Seção 4.6), **não** o mapa.
 
-#### 4.7.1 Sorteio — exatamente 2 uniformes por evento aceito, sempre
+#### 4.7.1 Sorteio — REESCRITA em 2026-08-09 (f): **ZERO** sorteios por evento, em todo canal
+
+> **NORMATIVO.** O modelo de contato da revisão (f) é **inteiramente determinístico**. Nenhum canal
+> consome número aleatório algum. O parâmetro `generator` **permanece na assinatura** de `resolve()`
+> e `collision_pass()` (Seção 9.1.1 inalterada) e **não é tocado**; `COLLISION_SEED` continua
+> existindo como o quarto fluxo do projeto e deixa de ter consumidor. `INV-32` está reescrito em
+> conformidade (Seção 6): o teste passa de "exatamente `2 n_events`" para "o estado do `Generator`
+> é **bit a bit idêntico** antes e depois de qualquer passe, com qualquer número de eventos e
+> qualquer mistura de canais" — que é a forma mais forte e mais barata do mesmo requisito.
+>
+> **Por que zero e não dois.** A proposta submetida mantinha `2` sorteios na erosão, para uma
+> inclinação transversal aleatória da direção de saída. Ela foi **retirada** (Seção 4.9(3)): a
+> velocidade relativa de saída herda a **componente tangencial** de `u`, que já é não radial e já
+> vem da dinâmica, de modo que o único efeito declarado do tilt — "não sair exatamente ao longo do
+> eixo" — está entregue **de graça e com origem física** em vez de sorteada. O que o tilt custaria:
+> um fluxo de aleatórios no caminho de resolução, um parâmetro a mais, e a perda da forma fechada de
+> `ΔL` sem tilt. **Se for reintroduzido**, ele é cosmético por declaração, tem de vir com cota dura
+> `theta < theta_max < pi/2` (senão `u' . n > 0` deixa de ser garantido e `INV-34` cai), e `INV-32`
+> volta à contagem fixa por evento.
+>
+> A subseção original segue preservada como registro. Ela **resolveu um problema real** — o consumo
+> de fluxo dependente de canal, que tornava `INV-19(c)` inatingível — e a solução da revisão (f) é
+> o limite dessa mesma ideia: o consumo mais previsível possível é nenhum.
 
 > **Esta subseção fecha uma lacuna real da versão anterior.** Ela dizia "um único uniforme por evento
 > aceito", e a Seção 4.9 então precisava de mais sorteios (`f`, e uma direção isotrópica cujo método
@@ -1476,10 +1864,19 @@ para cada evento aceito, na ordem do array AcceptedPairs
 Consequência direta e testável (`INV-32`): após um passe com `n_events` eventos aceitos, o
 `Generator` consumiu **exatamente `2 * n_events`** valores. Um passe com zero eventos consome zero.
 
-### 4.8 Faixa de `x` que a simulação realmente visita
+### 4.8 `[HISTÓRICO — APOSENTADO em 2026-08-09 (f)]` Faixa de `x` que a simulação realmente visita
+
+> **APOSENTADA junto com `x`.** Preservada porque é o registro do defeito: esta seção mediu a faixa
+> visitada (`x ∈ [~0.02, ~122]`) a partir da faixa de `|u|` do **estágio 2**, que é detecção sem
+> resolução, e concluiu *"nenhum canal é proibido"*. A conclusão era correta sobre o **suporte** da
+> distribuição e silenciosa sobre a sua **massa**: com o modelo resolvido, os contatos concentram-se
+> em `|u| = 12`–`24 m/s`, isto é `x ~ 13`–`53`, e o canal elástico recebe `p_el ~ 0.02`–`0.13`.
+> **A seção perguntou "algum canal é impossível?" quando a pergunta que decidia era "algum canal é
+> raro a ponto de não existir?".** A revisão (f) substitui a faixa de `x` pela reclassificação
+> direta de contatos registrados (Seção 4.6.5), que responde à segunda pergunta.
 
 > **REESCRITA em 2026-08-07 (b).** A tabela anterior decompunha `x` em função de `|u_inf|`, supondo
-> **queda isolada de dois corpos desde o infinito**. A Seção 4.6.1 mostra que essa não é a
+> **queda isolada de dois corpos desde o infinito**. A Seção 4.6-H.1 mostra que essa não é a
 > configuração que a dinâmica entrega, e a execução do estágio 3 confirmou. A decomposição correta,
 > com `v_esc_eff` retirado, é diretamente em `|u|` — a velocidade relativa **real no contato**, que
 > é o que a detecção mede e reporta em `rel_speed`.
@@ -1504,7 +1901,7 @@ nenhum corpo pode empurrar a si próprio para dentro de um canal.
 
 **A ressalva anterior sobre corpos massudos está RETIRADA.** Ela dizia que corpos massudos teriam
 `x` preso perto de `1` e que isso os "auto-regulava". Ambas as metades estavam erradas: `x` não
-ficava preso perto de `1`, ia a `0.03`; e o efeito não regulava, realimentava. Ver 4.6.1 e 4.13.2.
+ficava preso perto de `1`, ia a `0.03`; e o efeito não regulava, realimentava. Ver 4.6-H.1 e 4.13.2.
 
 **Risco declarado da nova forma.** Com `x = |u|²/v_coh²`, a fusão depende inteiramente de existirem
 encontros **lentos** (`|u| < ~2 m/s`). Se a distribuição de `|u|` no núcleo for mais dura que isso, o
@@ -1519,12 +1916,302 @@ Consequência normativa para o relatório: **as frações de canal realizadas s�
 parametrização, jamais uma predição física.** É permitido escrever "sob o modelo fixado na Seção 4.7,
 `X%` dos eventos foram fusões"; é proibido escrever "o colapso produz `X%` de fusões".
 
-### 4.9 Os três desfechos
+### 4.9 Os três canais — NORMATIVO desde 2026-08-09 (f)
 
-Notação comum: `M = m_i + m_j`, `mu = m_i m_j / M`, `u = v_j - v_i`, `V = (m_i v_i + m_j v_j)/M`,
-`T_cm = (1/2) mu |u|²`. Tudo avaliado na configuração de contato, em `t*`.
+Notação da Seção 4.6, toda avaliada na configuração de contato, em `t_c`. Adicionalmente
+`V = (m_i v_i + m_j v_j)/M` (velocidade do centro de massa do par) e
+`r_c = (m_i r_i + m_j r_j)/M` (posição do centro de massa do par, em `t_c`).
 
-#### (0) Regra de slots — normativa, e o índice menor sempre vence
+**As subseções `(0)` e `(0.1)` abaixo permanecem em vigor**, `(0)` com a emenda da regra de slots
+que esta revisão obriga. As subseções `(1)`, `(2)` e `(3)` estão **substituídas** pelo que segue e
+preservadas como registro.
+
+#### (A) Regra de slots por MASSA — emenda que fecha a transmutação
+
+A regra anterior era *"o índice menor sempre fica com o corpo"*. Ela garante determinismo, que era o
+seu propósito declarado, e **não garante continuidade**: numa fusão, um slot que continha `1 m_bar`
+podia passar a conter `300 m_bar` porque o seu índice era menor. Medido na linha de base: maior
+salto relativo de massa num slot **vivo** igual a **`1.207`** **[M]** — e este número é do modelo
+antigo, cuja fragmentação já embaralhava massas; a proposta submetida a esta revisão (lascar o corpo
+**maior** e pôr a lasca no slot do **menor**) o levaria, em `q = 949` com `f = 0.5`, a
+**`473.5`** **[T]**. Piorar o número que motivou a revisão não é opção.
+
+```
+REGRA NORMATIVA (substitui "o indice menor sempre vence"):
+
+  o slot do corpo de MAIOR massa recebe o produto de MAIOR massa;
+  o slot do corpo de MENOR massa recebe o produto de MENOR massa;
+  EMPATE EXATO de massa  ->  desempata pelo INDICE MENOR.
+```
+
+Determinismo é preservado integralmente (a regra é uma função das entradas, com desempate total), e
+a continuidade passa a ser demonstrável — `INV-33`.
+
+#### (B) FUSÃO — portão 1
+
+```
+slot G (o de MAIOR massa):   m <- M ,  r <- r_c ,  v <- V
+slot P (o de MENOR massa):   m <- 0 ,  r <- r_c ,  v <- V      (slot morto, Sec. 5)
+```
+
+Inalterada em substância; o que mudou é **qual** slot morre (regra `(A)`) e que a colocação em `r_c`
+agora é a única coisa que a fusão faz com posições. Conservações, todas exatas: massa, `P`,
+`sum_i m_i r_i` (é a única colocação que a preserva). `ΔK = -T_cm` exatamente. `ΔL = -mu (dr x u)`
+exatamente, e vai para `L_spin` (Seção 4.10).
+
+#### (C) RICOCHETE com restituição parcial — portão 3
+
+```
+e = E_RESTITUTION ,  e in (0, 1] ,  default 0.8
+
+Delta v_i = + (1 + e) mu u_n n / m_i
+Delta v_j = - (1 + e) mu u_n n / m_j
+
+posicoes INALTERADAS ;  massas INALTERADAS
+```
+
+> **CORREÇÃO DE SINAL À PROPOSTA SUBMETIDA.** A proposta escrevia
+> `Delta v_i = -(1+e) mu u_n n / m_i` e `Delta v_j = +(1+e) mu u_n n / m_j`, **com os dois sinais
+> trocados**. Como `u_n < 0` e `n` aponta de `i` para `j`, aquela forma empurra `i` **na direção de
+> `j`**: o par se atravessa em vez de ricochetear. Derivação, para não restar dúvida: com
+> `J_i = lambda n` e `J_j = -J_i`, tem-se `u' = u - J_i/mu`, e impor
+> `u' . n = -e u_n` dá `lambda = (1 + e) mu u_n`, que é **negativo** — logo `J_i` aponta ao longo de
+> `-n`, isto é, `i` é empurrado **para longe** de `j`, e `Delta v_i = J_i/m_i` é a forma acima.
+> **[T]** Em `e = 1` isto é `Delta v_i = 2 mu u_n n / m_i`, que é bit a bit o mapa implementado hoje
+> em `src/nbody/collisions.py` (`impulse = 2.0 * mu * u_dot_n * n_hat`, `v_i + impulse/m_i`) —
+> confirmando que **o código está certo e a proposta estava errada**, e preservando `INV-20` como
+> caso-limite exato.
+
+**Verificações pedidas, todas confirmadas [T]:**
+
+| grandeza | resultado, para **qualquer** `e` |
+|---|---|
+| massa | inalterada, exata |
+| `P` | conservado exatamente (impulsos opostos, `m` inalteradas) |
+| `L` | **conservado exatamente**, porque `n ∥ dr(t_c)` (Seção 4.3) e `ΔL = -(dr) x J = 0` |
+| `sum_i m_i r_i` | inalterado (posições e massas inalteradas) |
+| `U` | `ΔU = 0` **exatamente**, mútuo e de campo (nada se move, nada muda de massa) |
+| `ΔK` | `-(1/2) mu (1 - e²) u_n²`, forma fechada `O(1)` |
+| `e = 1` | reduz exatamente ao mapa elástico atual; `ΔK = 0`, `E_int` intocada |
+
+```
+E_int += (1/2) mu (1 - e^2) u_n^2                          (Sec. 4.10, caso fechado)
+```
+
+A conservação de `L` **melhorou** em relação ao mapa antigo: antes ela dependia de `n ∥ dr` no ponto
+de aplicação, o que era verdade, mas com `u . n = 0` o impulso era nulo e o teste era vazio. Agora
+o impulso é não nulo e a conservação é um teste com conteúdo — `INV-20`.
+
+**`e = 0` é PROIBIDO.** Com `e = 0` tem-se `u' . n = 0`: o par fica exatamente em contato com
+velocidade normal nula, a guarda de aproximação (estrita) não o rejeita nem o aceita de forma
+estável, e o resultado é um par pegajoso. `e ∈ (0, 1]`, verificado na construção do modelo, erro em
+tempo de configuração se violado.
+
+**A restituição parcial é o que fecha a cascata.** Encontros repetidos entre o mesmo par dissipam
+`(1-e²)` da energia normal a cada contato, `|u|` decresce, e o portão 1 (`|u| < v_esc`) **acaba por
+disparar**: o ricochete dissipativo é um funil para a fusão, e não um moinho de eventos. O ciclo
+termina porque um par ligado em contato tem `|u| < v_esc` por definição. **[T]**
+
+#### (D) EROSÃO — portão 2. Substitui a fragmentação, e o nome muda por obrigação
+
+> **A palavra "fragmentação" não pode sobreviver a este canal, e a razão é estrutural, não de
+> gosto.** Num modelo `2 -> 2` com continuidade de massa por slot, **os detritos não têm para onde
+> ir**: não existe terceiro slot. Toda redistribuição de massa possível é uma transferência entre os
+> dois participantes. Fragmentação real **ejeta** material; este canal só pode **transferi-lo**.
+> Chamá-lo de fragmentação é a quarta ocorrência, neste documento, de uma palavra carregando duas
+> afirmações em que a fraca é verificada e a forte é asserida. O canal chama-se **erosão**.
+
+**O corpo erodido é o MENOR. Isto é uma correção à proposta, e ela decide três coisas de uma vez.**
+
+A proposta lascava o corpo **maior**, com `E_lig` do maior. Três defeitos, todos medidos:
+
+1. **Física de impacto invertida.** `E_lig ∝ m^(5/3)`. Para `q = 949`, `E_lig(P)/E_lig(G) =
+   1.09e-5` **[T]**: o limiar de disrupção do projétil é `91500` vezes menor que o do alvo. Gatilhar
+   pelo maior é afirmar que um seixo estilhaça uma montanha e sai inteiro. O defeito `3` da caixa da
+   Seção 4.3 — *"um corpo mil vezes mais leve raspa num pesado e ambos viram dois de massa
+   arbitrária"* — é **exatamente esta inversão**, e lascar o maior não o corrige, o formaliza.
+2. **Descontinuidade de massa por slot.** Já quantificada em `(A)`: fator `473.5` em `q = 949`.
+3. **A geometria não fecha.** Ver `(D.1)`.
+
+**Mapa normativo:**
+
+```
+q       = m_G / m_P                       ( >= 1 )
+E_lig   = K_BIND * G m_P^2 / R_P          ( K_BIND = 3/5 , Sec. 4.6.2 )
+
+xi        = FRAG_CHIP_COEFF * ( T_n / E_lig - 1 )              ( > 0 sob o portao 2 )
+f_chip    = clamp( xi , 0 , FRAG_CHIP_MAX ) * ( 1 - q^(-5/3) ) ( fator de assimetria, ver D.2 )
+m_chip    = f_chip * m_P
+
+m_G' = m_G + m_chip                       (o MAIOR recebe)
+m_P' = m_P - m_chip                       (o MENOR perde)          m_G' + m_P' = M, exato
+mu'  = m_G' m_P' / M
+```
+
+**Cinemática — a erosão é o ricochete mais um custo, e essa é a construção que fecha a
+descontinuidade no portão.** A proposta submetida punha `u'` ao longo de `+n` com módulo
+`sqrt(2 T'_cm/mu')`, o que **descarta a componente tangencial** e, no limite `f_chip -> 0`, entrega
+`|u'| = |u|` — isto é, um choque **perfeitamente elástico** logo acima de um portão abaixo do qual o
+choque dissipa `(1-e²) = 36%`. Cruzar o limiar de disrupção **reduziria** a dissipação. A construção
+normativa aplica a restituição primeiro:
+
+```
+u_r  = u - (1 + e) u_n n                     (velocidade relativa pos-restituicao; u_r . n = -e u_n > 0)
+T_r  = (1/2) mu |u_r|^2
+
+E_custo = min( f_chip * E_lig , FRAG_ENERGY_MAX * T_r )        FRAG_ENERGY_MAX = 0.9
+se o min for pelo segundo termo:  f_chip <- E_custo / E_lig ,  e m_chip, m_G', m_P', mu' RECALCULADOS
+
+T'   = T_r - E_custo                          ( > 0 por construcao, ver D.3 )
+u'   = u_r * sqrt( T'/T_r ) * sqrt( mu/mu' )  (MESMA DIRECAO de u_r)
+```
+
+**Posições — nada é reposicionado, e o centro de massa do par é preservado exatamente.** Como massa
+foi movida entre dois pontos distintos, manter as posições literalmente congeladas **deslocaria**
+`sum_i m_i r_i` por `m_chip (r_G - r_P)`, isto é, moveria o baricentro do sistema sem força alguma.
+A correção é um **deslocamento rígido do par**, que não altera a separação e portanto não é
+reposicionamento no sentido proibido pela Seção 4.5:
+
+```
+Delta = ( m_chip / M ) * ( r_P - r_G )
+
+r_G' = r_G(t_c) + Delta          r_P' = r_P(t_c) + Delta
+```
+
+Verificação: `m_G' r_G' + m_P' r_P' = m_G r_G + m_P r_P` **exatamente** **[T]**, e
+`r_P' - r_G' = r_P - r_G` **exatamente** — a separação, a normal e a geometria de contato ficam
+literalmente intactas. `|Delta| = (m_chip/M) d_c <= 0.5 d_c`, isto é, no máximo meio raio de contato:
+`5e-3 m`, invisível em qualquer escala do problema.
+
+##### (D.1) A desigualdade `R_a + R_b < R_i + R_j` — a proposta estava FALSA, e a correção a torna um TEOREMA
+
+A proposta afirmava que, lascando o maior, `R_a + R_b < R_i + R_j` sempre, *"e é isso que faz o
+esquema fechar"*. **Falso.** Com `R ∝ m^(1/3)`, normalizando `m_alvo = 1` e `m_outro = 1/q`, a soma
+`(M - f)^(1/3) + f^(1/3)` é unimodal com máximo em `f = M/2`, e vale **exatamente** `1 + (1/q)^(1/3)`
+em `f = 1/q`. Logo, para `q > 1`:
+
+```
+R_a + R_b < R_i + R_j     <=>     f < 1/q     <=>     m_lasca < m_corpo_menor          [T]
+```
+
+Verificado numericamente sobre `4e5` pontos em `f` **[M]**: `f_max` medido `0.500000` (`q=2`),
+`0.200000` (`q=5`), `0.049998` (`q=20`), `0.009999` (`q=100`), `0.001052` (`q=949`), contra `1/q`
+previsto. Com `FRAG_CHIP_MAX = 0.5` e razões medidas até `949:1`, a desigualdade falha por **três
+ordens de grandeza**; até o piso `0.01` da proposta falha em `q = 949`.
+
+**Com a erosão do MENOR, a desigualdade é um teorema, e sem cota alguma.** `sum m^(1/3)` é
+estritamente Schur-côncava; transferir massa **do menor para o maior** produz um vetor que
+**majora** o anterior (a ordem `m_G' >= m_P'` é preservada para `f_chip <= 1`), e uma função
+Schur-côncava decresce estritamente sob majoração. Portanto
+
+```
+R_G' + R_P'  <  R_G + R_P        para todo f_chip in (0, 1], para todo q >= 1        [T]
+```
+
+Verificado numericamente sobre `q ∈ [1, 2000]` e `f ∈ (0, 1]`: máximo de
+`(R_G'+R_P') - (R_G+R_P)` igual a `-2.2e-13` em unidades normalizadas, isto é, negativo em toda a
+grade **[M]**. **Nenhum cap sobre `f_chip` é necessário para a geometria.**
+
+##### (D.2) Sobreposição pós-evento NÃO é uma condição física, e o invariante proposto está enfraquecido
+
+Ainda que a geometria feche em `(D.1)`, o invariante *"ausência de sobreposição pós-evento"* está
+**recusado como enunciado**, e a razão vale independentemente do canal: **em `chi = 0.1` a
+sobreposição de esferas de contato não tem significado dinâmico nenhum.** `R_i + R_j = 0.01 m` é um
+parâmetro de **seção de choque**; a força entre os corpos é a de Plummer com `eps = 0.05 m`, cinco
+vezes maior, perfeitamente lisa e finita em toda separação, inclusive zero. Não há força de contato,
+não há interpenetração, não há energia de compressão. Dois corpos "sobrepostos" são apenas dois
+corpos próximos.
+
+E o enunciado forte é **falso** de qualquer modo, por dois caminhos independentes: a fusão cria um
+corpo de raio `R(M) > R_G`, que pode sobrepor terceiros; e o ramo `c <= 0` da Seção 4.3 **começa**
+sobreposto por construção.
+
+O que de fato importa, e que substitui o invariante proposto, é a **separação**:
+
+```
+u' . n  >  0        em todo canal que deixa dois corpos vivos                        [T]
+```
+
+Ricochete: `u' . n = -e u_n > 0` para `e > 0`. Erosão: `u' ∥ u_r` e `u_r . n = -e u_n > 0`. E como
+`d/dt (dr . dv) = |dv|² >= 0` sob movimento retilíneo, um par que está se afastando em `t_c`
+**continua se afastando até o fim do passo**: a redetecção no mesmo passe é impossível, e no passo
+seguinte exige que a gravidade tenha revertido o movimento relativo. Isto é `INV-34`, e é o
+enunciado que a Seção 4.9.1 deveria ter tido quando escreveu *"impede recolisão imediata"* sem
+verificar a magnitude. Ver `INV-35` para a forma sobrevivente do enunciado sobre sobreposição.
+
+##### (D.3) Garantias fechadas da erosão
+
+Todas **[T]**, todas verificadas numericamente sobre `q ∈ [1, 1000]`, `|u_n|/|u| ∈ [0.05, 1]`,
+`f ∈ [0, 0.5]` **[M]**:
+
+| garantia | demonstração | valor |
+|---|---|---|
+| massa | `m_G' + m_P' = M` por construção | exato |
+| `P` | `m_G' v_G' + m_P' v_P' = M V` para **qualquer** `u'` e qualquer partição | exato |
+| `sum_i m_i r_i` | deslocamento rígido `Delta` acima | exato |
+| `T'` da relação `(1/2) mu' \|u'\|² = T'` | por construção do fator `sqrt(mu/mu')` | exato |
+| `T' > 0` | `T_r >= (e² ) T_cm` e `E_custo <= FRAG_ENERGY_MAX * T_r` | `T'/T_r >= 0.1` |
+| separação | `u' . n = (\|u'\|/\|u_r\|)(-e u_n) > 0` | estrita |
+| `\|u'\|/\|u\|` | `>= sqrt(max(e² - FRAG_CHIP_MAX, (1-FRAG_ENERGY_MAX) e²))`, pois `mu/mu' >= 1` sempre | **`0.374`** em `e = 0.8`; medido `0.432` |
+| `ΔL` | `dr x u' = (\|u'\|/\|u_r\|) (dr x u)` pois `n ∥ dr` | forma fechada |
+
+**O guarda de energia é obrigatório e não é decorativo.** Sem ele, `T' > 0` exige
+`e² > FRAG_CHIP_MAX`: com `e = 0.8` e `FRAG_CHIP_MAX = 0.5` sobra `T'/T_cm >= 0.14` **[T]**, mas com
+`e = 0.5` tem-se `e² = 0.25 < 0.5` e **`T'` pode ficar negativo** — e `e` é ajustável por decisão do
+projeto. O `min` com `FRAG_ENERGY_MAX * T_r`, seguido do recálculo de `f_chip`, torna o canal seguro
+para **todo** `e ∈ (0,1]` sem impor relação entre parâmetros.
+
+**A cota depende de `e`, e o documento a escreve assim de propósito.** Ela vale
+`0.7071`/`0.3742`/`0.1581`/`0.0632` para `e = 1.0`/`0.8`/`0.5`/`0.2`, contra mínimos varridos de
+`0.8165`/`0.4320`/`0.1623`/`0.0633` sobre `q ∈ [1,2000]`, `(u_n/|u|)² ∈ (0,1]`, `f ∈ [0, 0.5]`
+**[M]** — a cota é válida em toda a faixa e fica **justa** para `e` pequeno, onde a guarda de
+energia é o termo que morde. Escrever um número único aqui (`0.40`, por exemplo) reprovaria uma
+implementação correta assim que alguém baixasse `e`, que é um parâmetro **declarado ajustável**.
+
+**Comparação com o defeito `5`:** o modelo antigo deixava os fragmentos saindo a `0.065 |u|` no pior
+caso e **mais afastados** do que o par esteve **[M]**; a erosão com o `e` padrão garante
+`>= 0.374 |u|` e **mais próximos**. O mecanismo de recolisão que a Seção 4.9.1 mediu (`200` re-eventos no mesmo par)
+não é eliminado — a gravidade continua podendo trazer o par de volta — mas deixa de ser
+**construído** pelo mapa.
+
+##### (D.4) O fator de assimetria `(1 - q^(-5/3))`, e por que ele não é enfeite
+
+Note que `q^(-5/3) = E_lig(P)/E_lig(G)` exatamente. O fator lê-se: *"a lasca é proporcional a quanto
+o projétil é mais frágil que o alvo"*. Ele existe porque **a campanha do estágio 3 roda com massas
+iguais** (`Q = 0`, frio), onde `q = 1` e os dois corpos são igualmente disruptíveis: sem o fator, o
+mapa escolheria o "menor" por **desempate de índice** e transferiria massa numa direção decidida pela
+ordem dos slots. Isso é quebra de simetria por artefato de indexação, no exato regime em que a
+campanha mede. Com o fator, `f_chip -> 0` quando `q -> 1`, o canal degenera continuamente no
+ricochete, e a simetria é preservada. Custa um `pow`. **[T]**
+
+##### (D.5) Consequência estrutural declarada ANTES da execução
+
+Com a erosão do menor, **nenhum canal reduz a massa do maior corpo**: a fusão a aumenta, a erosão a
+aumenta, o ricochete a deixa igual. Logo `max_i m_i` é **monotonamente não decrescente**. Isto é uma
+propriedade estrutural nova — o modelo antigo, via fragmentação `2 -> 2`, podia partir um corpo
+grande (ainda que por transmutação, que é o defeito `3`).
+
+Isto **não** é apresentado como aperfeiçoamento. É o preço de exigir, ao mesmo tempo, continuidade
+de massa por slot e física de impacto com o sinal certo, dentro de um mapa `2 -> 2` sem terceiro
+slot. Registrado como tal, e coerente com a decisão da Seção 4.13.5 de aceitar o runaway como
+resultado em vez de modelar contra ele.
+
+**Alavanca pré-declarada, se e somente se `INV-31(C1)` (nenhuma semente termina com `N_final = 1`)
+reprovar:** erosão **simétrica** — cada corpo é erodido segundo o **seu próprio** `E_lig`, com a
+transferência líquida `m_chip(P) - m_chip(G)`, que para pares comparáveis flui do maior para o menor
+e restaura um mecanismo dispersivo. Custo declarado: dobra a lógica de ramo, e a desigualdade de
+`(D.1)` deixa de valer para pares comparáveis, passando a depender de `INV-35` em vez de `(D.1)`.
+Nenhuma outra alavanca é autorizada neste canal.
+
+#### `[HISTÓRICO]` Os três desfechos da versão anterior
+
+#### (0) `[SUPERSEDIDA por 4.9(A) em 2026-08-09 (f)]` Regra de slots — o índice menor sempre vence
+
+> **SUPERSEDIDA, não retirada.** O que esta subseção estabeleceu — que a regra de slots tem de ser
+> explícita, total e determinística — continua valendo e é o motivo de `INV-19(c)` ser atingível.
+> O que muda é a **chave**: `(A)` desempata por **massa** e só depois por índice. A regra por índice
+> era determinística e **descontínua**; a nova é as duas coisas. A tabela abaixo permanece como
+> registro do mapa antigo.
 
 > **Esta subseção fecha uma lacuna real da versão anterior**, que dizia "slot liberado: `m = 0`" sem
 > dizer **qual** dos dois slots é liberado, e descrevia os fragmentos como `a` e `b` sem dizer qual
@@ -1630,7 +2317,17 @@ colinear com `sep_sq == 0.0` verificado, e exigindo: ausência de `NaN` em `r`, 
 dentro de `100 eps_prec` na elástica; e as conservações de `m`, `P`, `L`, `K` já tabeladas — que
 neste caso valem com `ΔL = 0` **exato**, e não apenas dentro de tolerância.
 
-#### (1) Elástica
+#### (1) `[HISTÓRICO — SUBSTITUÍDA por 4.9(C) em 2026-08-09 (f)]` Elástica
+
+> **O mapa algébrico abaixo está CORRETO e foi preservado como o caso-limite `e = 1` do ricochete.**
+> O que estava errado nunca esteve nesta subseção: estava no **instante de avaliação** (`t*`, onde
+> `u . n = 0`), que tornava `J = 0` e o mapa a identidade. A tabela de resíduos medidos abaixo é,
+> retrospectivamente, a medição de conservações triviais de um mapa que não fazia nada — todas as
+> grandezas se conservavam porque nenhuma mudava. **Lição transferível: um teste de conservação
+> passa perfeitamente contra um mapa nulo, e nenhuma das cinco linhas de `INV-20` era capaz de
+> distinguir os dois casos. Um teste de conservação precisa de um companheiro que verifique que
+> algo mudou** — é o que `INV-20` passa a exigir na Seção 6.
+
 
 ```
 n     = ( dr + t* dv ) / | dr + t* dv |            (normal de contato, unitaria)
@@ -1661,7 +2358,15 @@ exatamente por isso que a Seção 4.5 aplica o impulso em `t*` e não no fim do 
 **Consequência: a colisão elástica é um mapa que conserva `E`, `P` e `L` exatamente.** `E_int` não é
 alterada. Nenhum tratamento de sobreposição residual é necessário nem permitido (Seção 4.5).
 
-#### (2) Fusão
+#### (2) `[HISTÓRICO — SUBSTITUÍDA por 4.9(B) em 2026-08-09 (f)]` Fusão
+
+> **Substância inalterada; muda apenas QUAL slot morre (regra 4.9(A): morre o do corpo menor, não
+> o de índice maior) e o portão que a dispara (Seção 4.6, portão 1, no lugar do sorteio).** Toda a
+> análise abaixo — `ΔK = -T_cm` exata, `ΔL = -mu(dr x u)` exata, colocação em `r_c` obrigatória,
+> comutação com o drift — permanece válida e é a base de `INV-21`. A conclusão de que **não existe
+> forma fechada** para `ΔU` (os termos de terceiro corpo) é a que a Seção 4.10 revisada finalmente
+> honra, computando-os em vez de declará-los resíduo.
+
 
 ```
 r_c    = ( m_i r_i + m_j r_j ) / M          (centro de massa do par, em t*)
@@ -1735,7 +2440,16 @@ Bônus algébrico: a fusão **comuta com o drift**, pois
 `M(r_c + (h-t*)V) = m_i(r_i + (h-t*)v_i) + m_j(r_j + (h-t*)v_j)` identicamente. **[T]** Logo a
 ordem entre "fundir" e "terminar o drift" é irrelevante — uma propriedade que os testes podem usar.
 
-#### (3) Fragmentação
+#### (3) `[HISTÓRICO — SUBSTITUÍDA por 4.9(D) em 2026-08-09 (f)]` Fragmentação
+
+> **Este é o canal que a revisão (f) descarta por inteiro**, e as suas provas de conservação
+> (massa, `P`, `T_cm`, `K`, `sum m r`) estavam **todas corretas**. O que estava errado é tudo o que
+> elas não cobriam: o corte `f ~ U[0.1, 0.9]` sobre a massa **combinada** (defeito `3`), o portão
+> inexistente (defeito `4`), a recolocação a `R_a + R_b` (defeito `5`), e a premissa `u . n < 0` em
+> `t*` (defeito `1`), que era falsa e sobre a qual a justificativa da direção de saída inteiramente
+> se apoiava. **Lição transferível: cinco conservações exatas não estabelecem que o mapa faz o que
+> a prosa em volta diz que ele faz.** Preservada como registro.
+
 
 > **REVISÃO NORMATIVA 2026-08-07: a direção isotrópica sorteada foi ELIMINADA.** A versão anterior
 > mandava sortear uma direção isotrópica `n_iso` para a velocidade relativa de saída, sem especificar
@@ -1958,6 +2672,99 @@ construída para salvá-lo.
 congeladas em `t*`, e nunca ao longo do passo.** Isso é inalterado e continua sendo o ponto que
 impede a contabilidade de absorver o erro de truncamento do integrador.
 
+> # REVISÃO NORMATIVA (f) — 2026-08-09. UMA REGRA ÚNICA, E A AFIRMAÇÃO DA SEÇÃO 4.10 PASSA A SER VERDADEIRA
+>
+> **A afirmação `E_total = K + U + E_int` "conservada por construção" era FALSA, e agora está
+> medida.** `E_int` contabilizava apenas os termos do próprio par; fusão e erosão movem massa e
+> mudam `U` em relação aos outros `N-2` corpos, e esse termo **nunca** foi contabilizado. A revisão
+> de 2026-08-07 o removeu deliberadamente do cálculo e o declarou "resíduo declarado e medido" de
+> `2.5e-6 |E_0|` por evento — **e essa estimativa era otimista por três ordens de grandeza**, porque
+> foi feita num estado de massas comparáveis e o termo escala com a massa movida.
+>
+> **Medido em 2026-08-09, `N = 600`, `6000` passos, `dt = 1e-3`, `chi = 0.1`, espectro Salpeter,
+> `|E_0| = 2.010e12`, `62` eventos [M]:**
+>
+> | grandeza | valor |
+> |---|---|
+> | resíduo não absorvido, acumulado | **`8.5602%` de `\|E_0\|`** |
+> | maior resíduo num único passe | **`0.9350%` de `\|E_0\|`** |
+> | passes com resíduo `> 1e-12 \|E_0\|` | **`62` de `62`** |
+>
+> A última linha é a que decide: **não há um único evento em que a conservação alegada se sustente.**
+> A previsão de `1.2e-3 |E_0|` acumulados (`EINT_DRIFT_3TFF`) errou por fator `71`. O que a Seção
+> 4.10 chamava de "preço aceito" era o degrau de energia que o usuário vê saltar no HUD a cada
+> evento.
+
+**REGRA ÚNICA, normativa, substituindo as três formas fechadas:**
+
+```
+para cada evento aceito, avaliado no estado CORRENTE do passe em t_c (Sec. 4.5, item 3):
+
+    E_int  +=  - ( Delta K  +  Delta U )
+    L_spin +=  L_int(antes) - L_int(depois)
+
+com, escrevendo d~_ab = sqrt( |r_a - r_b|^2 + eps^2 ) e a soma sobre k fora de {i, j}:
+
+    Delta K      = (1/2)( m_a |v_a|^2 + m_b |v_b|^2 )  -  (1/2)( m_i |v_i|^2 + m_j |v_j|^2 )
+
+    Delta U_par  = - G m_a m_b / d~_ab  +  G m_i m_j / d~_ij
+
+    Delta U_campo = - G * sum_k m_k [ ( m_a/d~_ak - m_i/d~_ik )
+                                    + ( m_b/d~_bk - m_j/d~_jk ) ]
+
+    Delta U      = Delta U_par + Delta U_campo
+
+    L_int(antes)  = mu  ( dr  x u  )
+    L_int(depois) = mu' ( dr' x u' )
+```
+
+**Confirmado: a fórmula de campo submetida está correta como escrita.** `U = -G sum_{p<q}
+m_p m_q/d~_pq`; os únicos termos afetados por um evento em `{i,j}` são o mútuo e os `2(N-2)` termos
+que acoplam `i` ou `j` a um terceiro corpo; a diferença desses é exatamente a expressão acima. É
+`O(N)` por evento, não `O(N²)`. **[T]**
+
+**Com essa regra, `E_total = K + U + E_int` é conservada EXATAMENTE pelo mapa de evento, a menos de
+arredondamento — pela primeira vez neste documento.** A demonstração é trivial e é o ponto:
+`Delta E_total = Delta K + Delta U + Delta E_int = Delta K + Delta U - (Delta K + Delta U) = 0`,
+identicamente, para qualquer canal e qualquer mapa de desfecho, **porque nenhum termo é omitido**.
+A tolerância deixa de ser um resíduo de modelo e passa a ser um resíduo de ponto flutuante:
+`TOL-EVENT-CONS` volta de `1e-5` para `1e-12 |E_0|` em fp64 (`INV-23`, `INV-36`).
+
+**Casos fechados, e o ricochete é exatamente `O(1)`:**
+
+| canal | `Delta U_par` | `Delta U_campo` | forma de `E_int +=` |
+|---|---|---|---|
+| **ricochete** | `0` exato | `0` exato | `(1/2) mu (1-e²) u_n²`, fechada, **sem soma `O(N)`** |
+| **fusão** | `+G m_i m_j / d~_ij` | soma `O(N)`, obrigatória | `-(ΔK + ΔU)` |
+| **erosão** | soma dos dois termos | soma `O(N)`, obrigatória | `-(ΔK + ΔU)` |
+
+O ricochete não move nada e não muda massa nenhuma, de modo que **todo** termo de `U` é idêntico
+antes e depois; a soma `O(N)` é matematicamente zero e **não deve ser executada** — executá-la só
+introduziria ruído de arredondamento numa quantidade exata. Isto é normativo, e é o único canal em
+que a forma fechada sobrevive.
+
+**Custo.** `O(N)` por evento com `n_events` eventos por passo, contra `O(N²)` da força. Com
+`n_events` medido em unidades de `10^0`–`10^1` por passo, a contabilidade fica **três ordens abaixo**
+do custo de `n_force` e não é otimizável de forma que preserve a exatidão. A alternativa — omitir o
+termo — é o defeito que esta revisão corrige, e o seu preço medido é `8.56%` de `|E_0|`.
+
+**O que morre com esta regra.** As três expressões fechadas da revisão anterior
+(`elástica: 0`, `fusão: T_cm - E_grav`, `fragmentação: E_grav_depois - E_grav_antes`), a função
+`_grav_energy` como parte do contrato de energia, o rótulo obrigatório *"deriva residual ~0.1%
+|E_0|"* e as constantes `EINT_THIRDBODY_RESID` e `EINT_DRIFT_3TFF`. **A correção de sinal de
+2026-08-07 (b) fica automaticamente incorporada**: com `E_int += -(ΔK + ΔU)` não há sinal a errar,
+porque a regra geral é a única forma escrita.
+
+**Rótulo obrigatório no HUD e em toda figura, SUBSTITUINDO o anterior:**
+`E_total = K + U + E_int (colisoes contabilizadas exatamente; residuo = arredondamento + truncamento
+do integrador)`. Continua **proibido** ler `E_total` como diagnóstico do integrador no regime
+pós-runaway, pela razão da Seção 4.11 `(D1)`, que é sobre magnitude relativa e não sobre omissão de
+termos — essa proibição sobrevive intacta e agora é a **única** ressalva sobre a curva.
+
+> **[HISTÓRICO — a partir daqui, a formulação da revisão (b), NÃO NORMATIVA.]** Preservada porque
+> registra a correção de sinal de 2026-08-07 (b), que era real, e a medição do termo de terceiros
+> que a subestimou. Leia o bloco abaixo como registro.
+
 > **REVISÃO NORMATIVA 2026-08-07: `E_int` é computada em FORMA FECHADA ao nível do par, `O(1)` por
 > evento.** A versão anterior exigia recomputar `ΔU` com a soma completa de terceiros, `O(N)` por
 > evento, e `INV-23(a)` exigia concordância ao nível da precisão de máquina. **O termo de terceiros
@@ -2049,7 +2856,7 @@ sendo `INV-21`/`INV-22`, não `INV-23(a)`.
 
 - **~~Fusão sempre incrementa `E_int` por um valor não negativo.~~ RETRATADO em 2026-08-07 (b).**
   A justificativa era "a conservação de energia do par que cai **desde separação grande** garante
-  `T_cm >= E_grav` no contato" — **a mesma premissa falsa da Seção 4.6.1**, aparecendo pela terceira
+  `T_cm >= E_grav` no contato" — **a mesma premissa falsa da Seção 4.6-H.1**, aparecendo pela terceira
   vez no documento. No núcleo suavizado o par chega com apenas `~40%` dessa energia, logo
   `T_cm < E_grav` é possível e comum para pares desiguais. Calculado **[T]**:
 
@@ -2249,7 +3056,7 @@ integradores; misturar os dois papéis anula os dois.
 > | `m*(m)` | `5.55` | `7.82` | `10.3` | `13.6` | `18.7` | `28.4` | `52.6` | `144` | `826` | `1.7e4` | `1.8e6` |
 >
 > **Não há ponto fixo. O "teto fechado" que esta seção anunciou não existe** sob a definição de `x`
-> que vigorava. A causa está identificada na Seção 4.6.1 e corrigida na Seção 4.6: retirado
+> que vigorava. A causa está identificada na Seção 4.6-H.1 e corrigida na Seção 4.6-H: retirado
 > `v_esc_eff`, `x` deixa de depender da massa, **e só então a derivação abaixo passa a ser válida**.
 >
 > **Registrar isto é o ponto.** Errar uma previsão é barato; não registrar por que se errou é caro. A
@@ -2478,7 +3285,7 @@ e então explosão em `~150` passos, de `7` para `128 m_bar`, seguindo até `321
   por `75.5x` e move `3.17 |E_0|` **num único evento** (Seção 4.10). Sem corpos massudos, esse termo
   é pequeno. **Corrigido o runaway, a magnitude colapsa junto.** Não há um terceiro problema
   escondido: os dois canais de falha compartilham a mesma raiz — a premissa de queda desde o
-  infinito, que a Seção 4.6.1 refuta.
+  infinito, que a Seção 4.6-H.1 refuta.
 
 **`321 m_bar` é "rápido demais"? Sim — e a pergunta é sobre a tela, não sobre rigor.** Três fatos
 visuais e estruturais, nenhum deles uma violação de conservação:
@@ -3420,7 +4227,7 @@ grosseira, uma constante escolhida a dedo ou um modelo fenomenológico são esco
 projeto. Dentro dela, não há escolha.
 
 > **O item 6 foi RETIRADO em 2026-08-07 (b), e a numeração dos demais está PRESERVADA** para não
-> invalidar referências. Eram nove; são oito. Ver a linha `~~6~~` abaixo, e a Seção 4.6.1.
+> invalidar referências. Eram nove; são oito. Ver a linha `~~6~~` abaixo, e a Seção 4.6-H.1.
 >
 > **Uma lição sobre esta lista, que vale mais que o item retirado.** O item 6 entrou no piso
 > justificado por um *defeito visível* ("sem o termo gravitacional nada nunca funde"), não por uma
@@ -3429,6 +4236,28 @@ projeto. Dentro dela, não há escolha.
 > premissa dinâmica que uma medição pudesse refutar. **Um item de piso que precise de um argumento
 > sobre o comportamento do sistema para se sustentar não é um piso; é uma previsão.** Novos itens só
 > entram aqui se quebrarem uma conservação, produzirem `NaN`, ou destruírem a reprodutibilidade.
+
+> **EMENDA 2026-08-09 (f) — três itens do piso mudam de conteúdo, nenhum de número.**
+>
+> - **Item 1: `t*` -> `t_c`.** A exigência era *"o impulso é aplicado em `t*`, com `n` paralela à
+>   separação naquele ponto"*. As duas metades eram satisfeitas e **o impulso era nulo mesmo assim**,
+>   porque em `t*` vale `u . n = 0` (Seção 4.3). O item passa a ser: **em `t_c`, o primeiro contato,
+>   onde `u . n < 0` estrito**. A coluna "o que quebra" ganha uma linha: *e se for aplicado em `t*`,
+>   `L` continua conservando, `K` continua conservando, e o impulso é zero — nenhum teste de
+>   conservação pega isso, só a cláusula de não trivialidade de `INV-20`.* **Este é o item que
+>   falhou, e ele falhou por dentro: a condição escrita era verdadeira e a intenção não.**
+> - **Item 5 passa de "não há o que corrigir" para "há, e a correção é a guarda".** A frase *"no
+>   esquema adotado a sobreposição nunca se forma"* era falsa em dois canais (Seção 4.9(D.2)). A
+>   proibição de reposicionar **fica**; o que sai é a justificativa de que ela é vácua.
+> - **Item 7 passa de "o termo mútuo está dentro" para "nenhum termo fica de fora".** Com a regra
+>   única `E_int += -(ΔK + ΔU)` da Seção 4.10, o termo mútuo e o de campo entram juntos, e a
+>   condicional *"se `E_int` existir"* permanece, com a mesma leitura.
+>
+> **Item novo, e ele é o `10` porque a numeração é preservada:** **a regra de slots é por MASSA
+> (Seção 4.9(A))**. O que quebra se sair: a massa de um corpo vivo salta descontinuamente — medido
+> `1.207` no modelo antigo **[M]**, e `473.5` na variante rejeitada **[T]** — e corpos somem e
+> reaparecem sem relação com os que colidiram. **É um defeito visível na tela**, que é o critério
+> de admissão desta lista, e nenhum invariante anterior o cobria (`INV-33`).
 
 Cada item traz **o que quebra** se alguém o simplificar depois. Nenhum destes é uma questão de
 precisão: são conservações exatas, ou defeitos visíveis na tela.
@@ -3440,7 +4269,7 @@ precisão: são conservações exatas, ou defeitos visíveis na tela.
 | **3** | `m_b = M - m_a`, e a partição de massa soma `M` (Seção 4.9) | A massa total não fecha. `INV-19(a)`. |
 | **4** | O pareamento é **disjunto**: um evento por slot por passe (Seção 4.5) | Um slot é consumido por dois mapas e massa e momento se perdem. É combinatório, não numérico: não há tolerância que o salve. |
 | **5** | **Nunca** reposicionar corpos sobrepostos "até se tocarem" (Seção 4.5, veto) | Afastar corpos torna `U` menos negativo: **injeta energia mecânica do nada**. O aglomerado aquece e se desliga. No esquema adotado a sobreposição nunca se forma, então não há o que corrigir. |
-| ~~**6**~~ | ~~`E_bind` mantém o termo gravitacional~~ **RETIRADO 2026-08-07 (b)** | A justificativa (`x >= 1` identicamente sem ele) era **falsa**: o piso real era `~0.4`, não `1` (Seção 4.6.1). E o termo **causava** o crescimento descontrolado que se acreditava que ele contivesse. Medido: `max m_i = 321 m_bar` (Seção 4.13.2). `v_esc_eff` não existe mais. |
+| ~~**6**~~ | ~~`E_bind` mantém o termo gravitacional~~ **RETIRADO 2026-08-07 (b)** | A justificativa (`x >= 1` identicamente sem ele) era **falsa**: o piso real era `~0.4`, não `1` (Seção 4.6-H.1). E o termo **causava** o crescimento descontrolado que se acreditava que ele contivesse. Medido: `max m_i = 321 m_bar` (Seção 4.13.2). `v_esc_eff` não existe mais. |
 | **7** | Se `E_int` existir, o **termo mútuo** `E_grav(m_i,m_j,d_ij)` está dentro dela (Seção 4.10) | `~10%` de `\|E_0\|` de dissipação fabricada, de sinal único, ao longo de uma execução. **[M]** Uma curva de energia visivelmente indo embora no HUD. |
 | **8** | `eps > 0` com colisões ligadas; `ValueError` se `softening == 0.0` (Seção 5.2, `INV-28`) | `0 * inf -> NaN` no campo de aceleração no primeiro slot morto coincidente com um corpo vivo. **A simulação inteira vira `NaN`.** |
 | **9** | O desempate `(t*, i, j)` na ordenação do pareamento (Seção 4.5) | Não é física: é reprodutibilidade. Duas execuções da mesma semente divergem, e entre dispositivos a execução deixa de ser publicável. `INV-19(c)`. |
@@ -3770,10 +4599,37 @@ reprodutível entre dispositivos e a execução não é publicável.
 **Se falhar (d).** A contabilidade de rejeição está errada (numerador ou denominador trocados, ou
 `f_reject` acumulado entre passes em vez de por passe). Não é um sintoma de `dt` grande demais.
 
-### `INV-20` — Colisão elástica: `m`, `P`, `L`, `K` exatos
+### `INV-20` — Ricochete: `m`, `P`, `L` exatos, `ΔK` fechado, e o mapa NÃO é a identidade
+
+> **EMENDA 2026-08-09 (f) — este invariante passava contra um mapa nulo.** Todas as cinco
+> conservações abaixo são satisfeitas trivialmente por `J = 0`, que é o que o mapa antigo aplicava
+> em todo evento resolvido no interior do passo (Seção 4.3, defeito `1`). Os resíduos medidos
+> `5.06e-17` e `3.63e-17` são de conservações de um mapa que não mudava nada. **Duas cláusulas novas
+> são acrescentadas, e são elas que dão conteúdo ao invariante.** O restante permanece.
+
+**(NOVA) Cláusula de não trivialidade — BLOQUEANTE.** Em todo evento de ricochete:
+
+```
+|u . n|  >=  1e-12 * |u|                      (o par se APROXIMA em t_c; Sec. 4.3)
+|Delta v_i| > 0  e  |Delta v_j| > 0           (o impulso existe)
+| u' . n / (-e * (u . n))  -  1 |  <=  100 eps_prec       (restituicao aplicada, com o e certo)
+| u'_t - u_t |  <=  100 eps_prec * |u|        (componente tangencial PRESERVADA)
+```
+
+A primeira linha é a que teria pego o defeito: com detecção em `t*`, `|u.n|/|u| <= 5.4e-6` medido em
+`8258` casos **[M]**, reprovando por seis ordens de grandeza. **Nenhuma cláusula de conservação
+podia pegá-lo, e é por isso que ele sobreviveu à suíte inteira.**
+
+**(NOVA) Cláusula de caso-limite.** Com `e = 1`, o mapa tem de reproduzir **bit a bit** o mapa
+elástico anterior `v_i' = v_i + 2 mu (u.n) n / m_i`, `v_j' = v_j - 2 mu (u.n) n / m_j`, e `ΔK = 0`
+dentro de `100 eps_prec`. Isto é o teste que pega a inversão de sinal registrada em 4.9(C).
+
+**(EMENDA) `ΔK`.** Deixa de ser `0` e passa a ser `-(1/2) mu (1-e²) u_n²`, com
+`|ΔK / (-(1/2) mu (1-e²) u_n²) - 1| <= 1e-12`. Em `e = 1` a cota degenera em `|ΔK|/K <= 100 eps_prec`.
 
 **Procedimento.** `500` eventos sintéticos com massas, posições e velocidades aleatórias
-(razão de massa até `1000`), aplicando o mapa da Seção 4.9 isoladamente.
+(razão de massa até `1000`), aplicando o mapa da Seção 4.9(C) isoladamente, e **todos construídos
+com `u . n < 0` estrito**, como a detecção da Seção 4.3 garante.
 
 **Tolerâncias**, todas normalizadas e derivadas de arredondamento de reduções curtas (`~10` termos),
 com margem `~100x` sobre o medido:
@@ -3793,6 +4649,14 @@ unitária. Este é o par de testes mais discriminante da suíte de colisões.
 
 ### `INV-21` — Fusão: conservações exatas e destruições exatas
 
+> **EMENDA 2026-08-09 (f).** Duas cláusulas acrescentadas: **(i)** o slot que morre é o do corpo de
+> **menor massa** (regra 4.9(A)), não o de índice maior — verificar explicitamente em pares com
+> `i` maior em massa e em pares com `j` maior em massa; **(ii)** o portão que disparou o evento é
+> `|u| < sqrt(2 G M / d~_c)` com `d~_c` **suavizado** (Seção 4.6-H.1), e o teste tem de incluir ao
+> menos um par que a forma **newtoniana** classificaria como fusão e a suavizada **não** — a faixa
+> `|u| ∈ (2.2881, 5.1668) m/s` para o par `m_bar`–`m_bar` **[T]** — exigindo que o resultado seja
+> **ricochete**. Sem essa cláusula a troca de `R` por `d~_c` não é testável.
+
 **Tolerâncias** (mesma base de `INV-20`):
 
 | grandeza | cota | observação |
@@ -3810,9 +4674,47 @@ unitária. Este é o par de testes mais discriminante da suíte de colisões.
 somando um termo de spin diretamente em `L_orb` em vez de em `L_spin`, o que mascara o efeito e
 torna `INV-24` vazio.
 
-### `INV-22` — Fragmentação: `m`, `P`, `T_cm`, `K` exatos
+### `INV-22` — Erosão: `m`, `P`, `sum m r` exatos; `T'` fechado; separação garantida
 
-**Tolerâncias:**
+> # REESCRITO em 2026-08-09 (f). O canal mudou de natureza; o invariante muda com ele.
+>
+> **O que sai:** `|ΔT_cm|/T_cm <= 100 eps_prec` (a erosão **dissipa** por construção, logo `T_cm`
+> não se conserva e a cláusula reprovaria uma implementação correta); `|ΔK|/K` (idem); a cláusula
+> de alinhamento `u' ∥ n` (a saída herda a componente tangencial, Seção 4.9(D)); a cláusula
+> `|r_a - r_b| = R_a + R_b` (não há recolocação); a cláusula de razão de massa `f ∈ [0.1, 0.9]` e o
+> teste KS de uniformidade (não há sorteio).
+>
+> **O que fica e o que entra:**
+>
+> ```
+> |Delta m| / M                                        <= 4 eps_prec
+> |Delta P| / |P|                                      <= 100 eps_prec
+> |Delta (sum m r)| / |sum m r|                        <= 100 eps_prec   <-- pega Delta ausente
+> | (1/2) mu' |u'|^2 / T'  -  1 |                      <= 1e-12
+> | (r_P' - r_G') - (r_P - r_G) | / d_c                 <= 100 eps_prec   <-- separacao INTACTA
+> u' . n                                                > 0               <-- BLOQUEANTE
+> |u'| / |u|   >= sqrt( max( e^2 - FRAG_CHIP_MAX , (1 - FRAG_ENERGY_MAX) e^2 ) )
+>                                                    <-- cota (D.3), DEPENDE DE e:
+>                                                        e=1.0 -> 0.7071   (medido 0.8165)
+>                                                        e=0.8 -> 0.3742   (medido 0.4320)
+>                                                        e=0.5 -> 0.1581   (medido 0.1623)
+>                                                        e=0.2 -> 0.0632   (medido 0.0633)
+> R_G' + R_P'  <  R_G + R_P                                               <-- teorema (D.1)
+> m_G' >= m_P'  e  m_G' + m_P' = M                                        <-- ordenacao preservada
+> f_chip -> 0 quando q -> 1                                               <-- fator de assimetria (D.4)
+> ```
+>
+> **A cláusula `Delta (sum m r)` é a discriminante desta lista.** Ela é a única que reprova uma
+> implementação que mova massa entre dois pontos sem aplicar o deslocamento rígido `Delta` da
+> Seção 4.9(D) — um erro invisível em `m`, `P`, `E` e `L`, e que faz o baricentro do sistema andar
+> sozinho.
+>
+> **Cláusula de guarda de energia — obrigatória.** Construir um evento com `e = 0.5` (isto é
+> `e² < FRAG_CHIP_MAX`) e `T_n` logo acima de `E_lig`, e exigir `T' > 0` e
+> `f_chip = E_custo/E_lig` recalculado. Sem o `min` com `FRAG_ENERGY_MAX * T_r` este caso produz
+> `T' < 0` e `NaN` na raiz. **[T]**
+
+**Tolerâncias `[HISTÓRICO — do canal de fragmentação, aposentado]`:**
 
 | grandeza | cota | medido |
 |---|---|---|
@@ -3971,7 +4873,15 @@ desprezível** — cota inferior `1e-8`. Se `L_spin` permanecer no nível de arr
 eventos não estão ocorrendo (então `INV-31(C2)` também falha), ou o termo de spin não está sendo
 acumulado, e `INV-24` estaria passando vazio.
 
-### `INV-25` — O mapa de regime é bem formado
+### `INV-25` — `[APOSENTADO em 2026-08-09 (f)]` O mapa de regime é bem formado
+
+> **APOSENTADO com `regime_probabilities()`.** As oito cláusulas abaixo eram todas corretas e todas
+> passavam. Elas verificavam a **boa formação** do mapa (soma `1`, positividade, monotonicidade,
+> simetria, estabilidade em fp32) e nenhuma delas verificava a **faixa de entrada**, que é onde o
+> defeito estava: `x ~ 13`–`53` no núcleo, `p_frag ~ 0.81`–`0.95` **[M]**. Preservado como registro,
+> e como o exemplo mais limpo deste documento de uma suíte exaustiva sobre a metade errada do
+> problema.
+
 
 **Reescrito nesta revisão** para o mapa `(1/x, 3, x)/Z` da Seção 4.7. As cláusulas que dependiam de
 `w` foram retiradas porque `w` não existe mais; a cláusula de simetria é nova e não tinha equivalente.
@@ -4005,7 +4915,14 @@ projeto de que nenhum canal tenha probabilidade exatamente zero.
 **Se (5) falhar.** Numeradores trocados entre `p_fus` e `p_frag`, ou `1/x` computado como `x` em
 algum ramo. É o teste mais barato da lista e o que pega a inversão de canal.
 
-### `INV-26` — Consistência entre o mapa e o sorteador
+### `INV-26` — `[APOSENTADO em 2026-08-09 (f)]` Consistência entre o mapa e o sorteador
+
+> **APOSENTADO: não há mapa e não há sorteador.** O critério de calibração `f_c >= 0.05` migra para
+> `INV-37`, com estatuto **REPORTADO e não bloqueante** — com portões determinísticos não existe
+> alavanca contínua para ajustar frações de canal, e um piso sobre uma saída que não se pode
+> ajustar não é um critério, é uma proibição de resultado. A alavanca autorizada, se algum canal
+> esvaziar, é `chi` (Seção 4.6.4), e ela não é um botão de fração de canal.
+
 
 **Enunciado.** As frações de canal realizadas concordam com as previstas pela integração do mapa
 sobre o histograma de `x` efetivamente visitado:
@@ -4027,11 +4944,31 @@ outra coisa a mexer.
 **Se falhar a cota binomial.** O `x` usado no sorteio não é o `x` registrado — tipicamente `E_bind`
 computado com o potencial não suavizado num lugar e suavizado no outro.
 
-### `INV-32` — O fluxo de colisão consome exatamente `2` sorteios por evento aceito
+### `INV-32` — O fluxo de colisão consome ZERO sorteios, em todo canal
 
-**Enunciado.** Após um passe de colisão com `n_events` eventos aceitos, o `Generator` de colisão
-consumiu **exatamente `2 * n_events`** valores uniformes, **independentemente dos canais sorteados**.
-Um passe com zero eventos consome zero. Seção 4.7.1.
+> **REESCRITO em 2026-08-09 (f).** O enunciado anterior (`exatamente 2 * n_events`) está preservado
+> abaixo como registro e continua sendo a forma correta **se** a inclinação transversal da
+> Seção 4.7.1 for reintroduzida. Enquanto ela não for, o modelo é determinístico e o enunciado é
+> mais forte.
+
+**Enunciado.** Após **qualquer** passe de colisão — qualquer número de eventos aceitos, qualquer
+mistura de canais — o estado interno do `Generator` de colisão é **bit a bit idêntico** ao de antes
+do passe.
+
+**Procedimento.** Serializar o estado do `Generator` (`gen.bit_generator.state`) antes e depois de um
+passe com pelo menos um evento de cada canal, e comparar por igualdade estrutural exata. Um único
+teste, sem tolerância.
+
+**Se falhar.** Sobrou consumo de aleatório no caminho de resolução — candidato mais provável: um
+sorteio de `f` remanescente do canal de fragmentação, ou uma inclinação transversal reintroduzida
+sem a emenda correspondente a este invariante.
+
+**Consequência.** `INV-19(c)` (determinismo bit a bit) passa a ser trivialmente atingível: não há
+fluxo a sincronizar. Este é o benefício colateral mais barato da decisão (b) do projeto.
+
+**`[HISTÓRICO]` Enunciado anterior.** Após um passe de colisão com `n_events` eventos aceitos, o
+`Generator` de colisão consumiu **exatamente `2 * n_events`** valores uniformes, **independentemente
+dos canais sorteados**. Um passe com zero eventos consome zero. Seção 4.7.1.
 
 **Procedimento.** Dois caminhos, ambos obrigatórios:
 
@@ -4049,6 +4986,181 @@ Um passe com zero eventos consome zero. Seção 4.7.1.
 provável: uma direção isotrópica remanescente na fragmentação, que a Seção 4.9 removeu).
 **Bloqueante:** sem passo fixo, `INV-19(c)` não pode ser satisfeito e nenhuma execução colisional é
 reprodutível.
+
+### `INV-33` — Continuidade de massa por slot
+
+**Enunciado.** Ao longo de um passe de colisão, para todo slot `k` que está **vivo antes e depois**
+(`m_k > 0` nas duas pontas):
+
+```
+canal        cota sobre |Delta m_k| / m_k(antes)
+-----------  ------------------------------------------------------------------
+ricochete    0                          (exato, sem tolerancia)
+erosao       <= FRAG_CHIP_MAX = 0.5     (o slot menor perde; o maior ganha <= f_chip * m_P / m_G)
+fusao        <= m_menor / m_maior <= 1  (so' o slot sobrevivente; o outro morre)
+```
+
+e o **único** slot cuja massa muda de forma descontínua é um slot que **morre** (`m -> 0`, fusão).
+
+**Procedimento.** Instrumentar o passe para registrar `(k, m_antes, m_depois, canal)` de todo slot
+tocado, ao longo de uma execução completa `RUN_COLLISION`, e reportar
+`max_k |Delta m_k| / m_k(antes)` sobre os slots vivos.
+
+**Tolerância.** Estrutural, sem folga: a violação é lógica, não numérica.
+
+**Baseline a bater [M].** Modelo antigo, `N = 600`, `6000` passos, `dt = 1e-3`, espectro Salpeter:
+maior salto relativo num slot vivo **`1.207`**. Proposta de lascar o corpo maior, `q = 949`,
+`f = 0.5`: **`473.5`** **[T]**. Modelo (f): cota `0.5` por construção na erosão.
+
+**Se falhar.** A regra de slots por massa (4.9(A)) não foi implementada, ou o canal de erosão está
+transferindo massa do maior para o menor (sinal invertido em `m_chip`).
+
+**Isto é o invariante que corresponde ao defeito observado na tela** — corpos que "somem e reaparecem
+como corpos de massa e posição sem relação com os que colidiram". Nenhum invariante anterior o
+cobria.
+
+### `INV-34` — Separação pós-evento
+
+**Enunciado.** Para todo evento aceito que deixa **dois corpos vivos** (ricochete e erosão), com `n`
+a normal de contato em `t_c` e `u'` a velocidade relativa de saída:
+
+```
+u' . n  >  0             estrito, sem tolerancia
+```
+
+e, como corolário verificável, `dr . dv > 0` no fim do passo para esse par.
+
+**Procedimento.** Registrar `u' . n / (|u'| |n|)` em todo evento de `RUN_COLLISION` e exigir o
+mínimo estritamente positivo. Adicionalmente, um teste sintético: um par com `e = 0.05` (restituição
+quase nula) ainda tem de satisfazer o enunciado.
+
+**Tolerância.** Binária.
+
+**Se falhar.** Sinal invertido no impulso de ricochete (4.9(C)) — o erro exato que a proposta
+submetida continha — ou `u'` construído a partir de `-n` na erosão.
+
+**O que este invariante SUBSTITUI.** A afirmação da Seção 4.9.1 de que a colocação *"impede
+recolisão imediata"*, que nunca teve teste e cuja magnitude nunca foi analisada. Este enunciado é
+mais fraco (não impede recolisão em passos futuros) e é **verdadeiro**.
+
+### `INV-35` — Sobreposição: o enunciado que sobrevive
+
+**Enunciado.** Ao fim de todo passe de colisão, **não existe par `(i, j)` que esteja simultaneamente
+sobreposto (`|r_i - r_j| < R_i + R_j`) e se aproximando (`(r_j - r_i) . (v_j - v_i) < 0`)**, exceto
+os pares adiados pelo pareamento disjunto, que são contados em `f_reject` e reportados
+separadamente.
+
+> **O enunciado forte — "ausência de sobreposição pós-evento" — está RECUSADO, e a recusa é
+> normativa.** Ele é falso por dois caminhos independentes: a fusão cria um corpo de raio `R(M)`
+> maior que qualquer um dos dois anteriores, e o ramo `c <= 0` da Seção 4.3 **começa** sobreposto
+> por construção. E é **fisicamente vazio**: em `chi = 0.1` o raio de contato é `5x` menor que
+> `eps`, a força de par é a de Plummer em toda separação, e não existe força de contato, energia de
+> compressão ou interpenetração. Duas esferas de contato sobrepostas são dois corpos próximos, e
+> nada mais. O que precisa ser verdade — e é o que este invariante enuncia — é que a sobreposição
+> **se desfaz sozinha**, o que `INV-34` garante e a guarda de aproximação executa.
+
+**Procedimento.** Varredura `O(N²)` ao fim de um passe, em `RUN_COLLISION`, a cada `100` passos.
+Reportar a contagem de violações e, para cada uma, se ela é um par adiado.
+
+**Se falhar com pares NÃO adiados.** A guarda de aproximação foi afrouxada de `< 0` para `<= 0`, ou
+o canal de erosão está deixando o par com `u' . n <= 0` (então `INV-34` também falha, e é o
+diagnóstico mais direto).
+
+### `INV-36` — `Delta E_total` por evento limitado a ARREDONDAMENTO
+
+**Enunciado.** Recalculando `E_total = K + U + E_int` imediatamente antes e depois de cada mapa de
+desfecho, com as posições avaliadas em `t_c` pela regra da Seção 4.5 item 3:
+
+```
+| Delta(K + U + E_int) | / |E_0|   <=   TOL-EVENT-CONS  =  1e-12     (fp64)
+                                                        =  1e-5      (fp32)
+```
+
+**A tolerância volta de `1e-5` para `1e-12` em fp64, e isso é o ponto do invariante.** A revisão de
+2026-08-07 a afrouxou por quatro ordens porque `E_int` passara a omitir os termos de terceiro corpo;
+com a regra única da Seção 4.10 nada é omitido, e a única fonte de resíduo é a soma de `N` termos em
+`U`, cujo erro relativo é `O(sqrt(N) eps_prec) ≈ 3.5e-15` para `N = 1000`. `1e-12` é `~300x` acima
+disso.
+
+**Cláusula agregada, obrigatória e separada.** Ao longo de `RUN_COLLISION` completa:
+
+```
+| soma dos residuos por evento | / |E_0|   <=   1e-9
+numero de eventos com residuo > 1e-12 |E_0|  =  0
+```
+
+**Baseline a bater [M].** Modelo antigo, `N = 600`, `62` eventos: resíduo acumulado **`8.5602%`** de
+`|E_0|`, pior passe **`0.9350%`**, e **`62` de `62`** eventos acima do piso. A segunda linha da
+cláusula agregada é a que converte esse `62/62` em `0/n`.
+
+**Se falhar com resíduo de SINAL ÚNICO.** Um termo inteiro está faltando na soma — quase certamente
+`Delta U_campo`, que é o defeito `6`. Sinal único é a assinatura de omissão; sinal alternante é a
+assinatura de arredondamento.
+
+**Se falhar SÓ nos eventos com `n_events > 1` no mesmo passe.** A regra do estado corrente
+(Seção 4.5, item 3) não foi implementada: os eventos estão sendo avaliados todos contra a
+configuração de início de passo.
+
+**Este invariante é o sucessor direto de `(D3)`** e é o único teste da suíte capaz de pegar um termo
+de energia esquecido. `INV-23` continua existindo com o mesmo enunciado; `INV-36` é a sua versão
+apertada e com a cláusula agregada que faltava.
+
+### `INV-37` — Os portões: precedência, cobertura e sobreposição
+
+**Enunciado, quatro cláusulas.**
+
+1. **Precedência.** Construir eventos sintéticos que satisfaçam **os dois** portões (possível para
+   `q > K_BIND * d~_c / R_P`, isto é `q > 6.237` para `m_P = m_bar` **[T]**) e exigir desfecho
+   **fusão**. Sem esta cláusula a ordem da cascata não é testada.
+2. **Fronteira.** Varrer `|u|` em torno de `v_esc = sqrt(2 G M / d~_c)` e `T_n` em torno de `E_lig`
+   e exigir que o desfecho mude **exatamente** no cruzamento, dentro de `100 eps_prec` relativos.
+3. **Suavizado, não newtoniano.** Ao menos um par no intervalo `|u| ∈ (sqrt(2GM/d~_c),
+   sqrt(2GM/R))` — para `m_bar`–`m_bar`, `(2.2881, 5.1668) m/s` **[T]** — com desfecho **ricochete**
+   e não fusão. Esta é a única cláusula que distingue as duas formas de `v_esc`.
+4. **Continuidade no portão 2.** Fazendo `T_n -> E_lig^+`, o desfecho de erosão tem de convergir ao
+   desfecho de ricochete: `f_chip -> 0`, `E_custo -> 0`, `u' -> u_r`. Cota: para
+   `T_n/E_lig - 1 = 1e-6`, `|u' - u_r| <= 1e-5 |u|`.
+
+**Cláusula REPORTADA, não bloqueante.** As frações de canal realizadas `f_fus`, `f_ric`, `f_ero` vão
+para o CSV e para o HUD. **Nenhum teste falha por causa dos seus valores.** Com portões
+determinísticos não existe alavanca contínua sobre eles (Seção 4.6.4), e um piso sobre uma saída
+inajustável não é critério. Predição registrada em 4.6.5, com estatuto **[A]**.
+
+**Se (4) falhar.** A erosão foi implementada com `u'` ao longo de `+n` puro em vez de herdar a
+direção de `u_r` — a construção da proposta original, que faz o desfecho **saltar** de dissipativo
+(`e = 0.8`) para elástico (`e` efetivo `= 1`) ao cruzar o portão.
+
+### `INV-38` — Detecção no primeiro contato: conjunto de eventos e sinal de `u . n`
+
+**Enunciado, três cláusulas.**
+
+1. **Equivalência do conjunto de eventos.** Sobre `2e6` configurações sintéticas de par com
+   `dr`, `dv` aleatórios e `R` amostrado da faixa real, o teste antigo (`|sep(t*)| < R` com
+   `t* = clamp(-b/2a, 0, h)`) e o novo (guardas 1–5 da Seção 4.3) aceitam **o mesmo conjunto**, com
+   discrepância admitida apenas em `|q(h)| <= 100 eps_prec |R²|` (a borda de medida nula).
+   Fração discrepante esperada: `< 1e-5`.
+2. **Sinal, BLOQUEANTE — e a cota tem de ser sobre a DISTRIBUIÇÃO, não sobre o mínimo.** A condição
+   pontual `u . n < 0` estrita é necessária mas **não** teria pego o defeito: encontros rasantes
+   legítimos têm `|u.n|/|u|` arbitrariamente pequeno, de modo que qualquer piso pontual ou reprova
+   um evento válido ou passa por cima do mapa nulo. A forma testável é a mediana:
+
+   ```
+   mediana de |u . n| / |u|  sobre os eventos aceitos de uma execucao real   >=  0.30
+   ```
+
+   Com detecção no primeiro contato e parâmetro de impacto uniforme no disco de raio `R`, tem-se
+   `(u.n/|u|)² = 1 - (b/R)² ~ U(0,1)`, logo a mediana prevista é `sqrt(0.5) = 0.7071` **[T]**. Com
+   detecção em `t*` ela é `< 1e-5` **[M]** — a cota reprova o mapa nulo por quatro ordens e deixa
+   `2.4x` de folga sobre o valor previsto.
+3. **Estabilidade da raiz.** Para `4ac/b² <= 1e-12` (encontro rápido), comparar `t_c` calculado pela
+   forma racionalizada contra o mesmo cálculo em precisão estendida (`float128` ou
+   `fractions.Fraction`) e exigir erro relativo `<= 1e-13`. Comparar também com a forma canônica
+   `(-b - sqrt(D))/(2a)` e **exigir que a canônica falhe** essa cota em pelo menos um caso da
+   grade — sem isso, a escolha da forma estável não está testada, apenas afirmada.
+
+**Se (1) falhar com eventos PERDIDOS.** A guarda `D > 0` foi escrita como `D >= 0`, ou o ramo
+`c <= 0` está ausente e pares já sobrepostos deixaram de ser candidatos — o que reabre as colisões
+pegajosas por outro caminho.
 
 ### `INV-27` — `m = 0` é fisicamente inerte
 
@@ -4337,20 +5449,35 @@ VEL_LAMBDA_SD         = 1.291e-2         # sd de lambda = 0.5*sqrt(2/(3N))
 CHI_DEFAULT           = 0.1              # [M] FIXADO: N_coll/particula = 0.938 medido (Sec. 4.1.1)
 R_REF_DEFAULT         = 5.0e-3           # m = CHI_DEFAULT * SOFTENING
 N_STEPS_COLLISION     = 12600            # 3 t_ff a DT_COLLAPSE (massas iguais) -- era 50400
-MAP_X_CLAMP           = 1.0e12           # [T] clamp de x; menor prob = X_CLAMP^-2 = 1e-24
-MAP_ELASTIC_WEIGHT    = 3.0              # [T] a constante do numerador elastico em (1/x, C, x)
-COLLISION_DRAWS_PER_EVENT = 2            # [T] normativo, Sec. 4.7.1 -- fixo para TODO canal
-FRAG_F_MIN            = 0.1              # f = FRAG_F_MIN + (1 - 2*FRAG_F_MIN) * u2
-FRAG_ETA              = 0.0              # fracao dissipada na fragmentacao (desligada)
-FRAG_K_MAX            = 0.70             # E[max(f,1-f)] = 3/4 - FRAG_F_MIN/2, EXATO
+# --- modelo de contato DETERMINISTICO, revisao (f) 2026-08-09 (Sec. 4.6, 4.9, 4.10)
+E_RESTITUTION         = 0.8              # [A] restituicao do ricochete; DOMINIO (0, 1]; e=0 PROIBIDO
+K_BIND                = 0.6              # [A] E_lig = K_BIND * G m^2 / R; 3/5 = esfera UNIFORME
+FRAG_CHIP_COEFF       = 0.5              # [A] fracao do excesso de energia gasta em lascar
+FRAG_CHIP_MAX         = 0.5              # [A] teto de f_chip; o modelo nao remove mais de metade do projetil
+FRAG_ENERGY_MAX       = 0.9              # [T] guarda: E_custo <= FRAG_ENERGY_MAX * T_r, garante T' > 0
+                                         #     para TODO e in (0,1]; sem ela e^2 > FRAG_CHIP_MAX
+                                         #     seria pre-requisito (e=0.5 daria T' < 0)
+COLLISION_DRAWS_PER_EVENT = 0            # [T] Sec. 4.7.1 reescrita: o modelo (f) e' DETERMINISTICO
+
+# APOSENTADOS em 2026-08-09 (f) -- nao sao mais simbolos do projeto:
+#   MAP_X_CLAMP, MAP_ELASTIC_WEIGHT   -- Sec. 4.7; nao ha mapa de probabilidades
+#   FRAG_F_MIN, FRAG_ETA, FRAG_K_MAX  -- Sec. 4.9(3); nao ha corte de massa sorteado
+#   EINT_THIRDBODY_RESID, EINT_DRIFT_3TFF -- Sec. 4.10; o termo de campo e' COMPUTADO, nao residual.
+#     Valores antigos (2.5e-6 e 1.2e-3) preservados so' no texto: a medicao de 2026-08-09 deu
+#     8.56e-2 acumulado, isto e', a estimativa errou por fator 71.
+# Valores antigos, preservados como registro:
+#   MAP_X_CLAMP = 1.0e12 ; MAP_ELASTIC_WEIGHT = 3.0 ; COLLISION_DRAWS_PER_EVENT = 2
+#   FRAG_F_MIN = 0.1 ; FRAG_ETA = 0.0 ; FRAG_K_MAX = 0.70
 # MASS_CAP_UNIFORM / MASS_CAP_DEFAULT: RETRATADAS em 2026-08-08.  A formula da Sec. 4.12 da
 #   m* em unidades do PARCEIRO, nao de m_bar, e a fragmentacao 2->2 nao e' sumidouro de massa.
 #   NAO HA TETO.  Valores antigos (5.667 e 3.17) preservados so' no texto, como registro do erro.
 MASS_CAP_MEASURED     = 321.26           # [M] max_i m_i / m_bar de fato observado em 3 t_ff
-COLLISION_SEED        = 20190225         # quarto fluxo, separado
+COLLISION_SEED        = 20190225         # quarto fluxo, separado -- SEM CONSUMIDOR desde a
+                                         #   revisao (f); mantido no contrato (Sec. 9.1.1) e no
+                                         #   estado, e verificado intocado por INV-32
 
 # REMOVIDO em 2026-08-07 (b): v_esc_eff e todo o termo gravitacional de E_bind.
-#   x = |u|^2 / v_coh^2 , v_coh = V_CHAR.  Ver Sec. 4.6.1: o termo CAUSAVA o runaway
+#   x = |u|^2 / v_coh^2 , v_coh = V_CHAR.  Ver Sec. 4.6-H.1: o termo CAUSAVA o runaway
 #   (max m_i = 321 m_bar medido) em vez de conte-lo, e o piso x >= 1 que ele existia
 #   para corrigir nunca existiu (o piso real era ~0.4).  PISO item 6 retirado.
 
@@ -4361,8 +5488,23 @@ COLL_C_COLL_MAX       = 1.8137           # [M] reportado, NAO limitado
 COLL_F_REJECT_TOTAL   = 4.07e-3          # [M] reportado, NAO limitado
 COLL_U_MAX            = 36.3             # [M] m/s -- era [A] 30.0
 CORE_NUMBER_DENSITY   = 2888.3           # [M] m^-3 -- refuta o ~1.4e3 de integradores.md Sec. 4.3
-EINT_THIRDBODY_RESID  = 2.5e-6           # [M] residuo por evento, em unidades de |E_0|
-EINT_DRIFT_3TFF       = 1.2e-3           # [M] deriva acumulada esperada, em unidades de |E_0|
+EINT_THIRDBODY_RESID  = 2.5e-6           # [M] APOSENTADO -- subestimava por ~3 ordens
+EINT_DRIFT_3TFF       = 1.2e-3           # [M] APOSENTADO -- medido 8.56e-2 (fator 71)
+
+# medido em 2026-08-09, modelo ANTIGO, N=600, 6000 passos, dt=1e-3, Salpeter, |E0|=2.010e12 [M]
+# -- e' a linha de base contra a qual INV-33 e INV-36 sao escritos:
+BASE_EVENTS_N600      = 62               # [M] eventos no passe completo
+BASE_INTERIOR_FRAC    = 0.21             # [M] fracao resolvida em t* interior -> impulso NULO
+BASE_MASS_JUMP_MAX    = 1.207            # [M] maior salto relativo de massa num slot VIVO
+BASE_EINT_LEAK_TOTAL  = 8.5602e-2        # [M] residuo acumulado nao absorvido, em |E0|
+BASE_EINT_LEAK_MAX    = 9.350e-3         # [M] pior passe, em |E0|
+BASE_EINT_LEAK_COUNT  = 62               # [M] de 62 -- TODOS os eventos vazam
+# escalas de par derivadas dos portoes (Sec. 4.6), par m_bar--m_bar, chi = 0.1 [T]
+PAIR_D_SOFT_MBAR      = 5.0990e-2        # m = sqrt((R_i+R_j)^2 + eps^2)
+PAIR_VESC_SOFT_MBAR   = 2.2881           # m/s -- portao 1
+PAIR_VESC_NEWT_MBAR   = 5.1668           # m/s -- forma newtoniana, REJEITADA (Sec. 4.6.1)
+PAIR_ELIG_MBAR        = 8.0089e9         # J = K_BIND * G m_bar^2 / R_ref
+GATE_Q_OVERLAP        = 6.237            # [T] acima disto os dois portoes se sobrepoem
 
 # REMOVIDOS nesta revisao (nao sao mais simbolos do projeto):
 #   DT_COLLISION        -- ver Sec. 4.4; usa-se DT_COLLAPSE = 5.0e-4
@@ -4546,6 +5688,27 @@ Listadas com justificativa.
 > conforme a tabela, `tests/_stage2_binding.py` pode ser **deletado**, e com ele todos os
 > `pytest.skip(ContractGap)` de `tests/test_collision_detection.py` e
 > `tests/test_collision_pairing.py`.
+
+> # EMENDA 2026-08-09 (f) — mudanças de assinatura obrigatórias
+>
+> | símbolo | mudança |
+> |---|---|
+> | `CollisionModel.v_coh` | **REMOVIDO** (campo `kw_only` obrigatório). Nada o consome. |
+> | `CollisionModel.e_restitution` | **NOVO**, `float = E_RESTITUTION`, domínio `(0, 1]`, validado em `__post_init__` com `ValueError` — `e = 0` é proibido (Seção 4.9(C)) |
+> | `CollisionModel.k_bind` | **NOVO**, `float = K_BIND` |
+> | `CollisionModel.chip_coeff`, `.chip_max`, `.energy_max` | **NOVOS**, `float`, defaults da Seção 8 |
+> | `v_coh_from_state` | **REMOVIDA** do módulo |
+> | `regime_probabilities` | **REMOVIDA** do módulo |
+> | `CollisionCandidates.t_star` / `AcceptedPairs.t_star` | **RENOMEADOS** para `t_c`. O nome antigo descreve o mínimo de separação, que não é mais o que o campo contém; manter `t_star` seria carregar a semântica revogada por todo o código. |
+> | `CollisionCandidates` / `AcceptedPairs` | **NOVO campo** `u_n: Tensor` (componente normal da velocidade relativa em `t_c`, `< 0`). É computado na detecção e seria recomputado em `resolve`; expô-lo evita divergência entre os dois e torna `INV-38(2b)` mensurável sem instrumentação extra. |
+> | `resolve` | `generator` **permanece no parâmetro** e **não é consumido** (Seção 4.7.1, `INV-32`) |
+> | `resolve` | ganha `positions_at(t) -> Tensor` ou equivalente, para a regra de estado corrente da Seção 4.5 item 3 — a contabilidade de `ΔU` de campo precisa das posições de **todos** os slots em `t_c` |
+> | `CollisionOutcome` | **NOVOS campos** `n_ricochet`, `n_erosion` substituindo `n_elastic`, `n_fragment`; `n_merge` inalterado |
+>
+> **A remoção de `v_coh` é uma quebra de API deliberada e não deve ser suavizada com um default.**
+> Um `v_coh` aceito e ignorado deixaria chamadores existentes passando um valor que não faz nada, que
+> é a forma mais silenciosa possível de um parâmetro morto. A construção `CollisionModel(r_ref,
+> m_bar)` posicional continua válida bit a bit, porque os campos novos são `kw_only` com default.
 
 **JÁ IMPLEMENTADO — transcrito de `src/nbody/collisions.py`, e agora vinculante:**
 
@@ -4772,7 +5935,7 @@ erro**, forçada por uma predição que falhou (Seção 4.13.2).
 **A raiz única.** Os cinco itens acima, mais o erro de análise da Seção 4.12, descendem todos de
 **uma única premissa falsa**: a de que o par chega ao contato com a energia de uma **queda desde o
 infinito**. Num núcleo suavizado a queda é desde a separação interpartícula local, que já está dentro
-do raio de suavização, e entrega apenas `~40%` daquela energia (Seção 4.6.1). A premissa apareceu
+do raio de suavização, e entrega apenas `~40%` daquela energia (Seção 4.6-H.1). A premissa apareceu
 **três vezes** no documento — em 4.6 (argumento 1), em 4.10 ("fusão sempre dissipa") e em 4.8
 (decomposição em `|u_inf|`) — e as três sobreviveram à revisão (a) porque nenhuma foi confrontada com
 a dinâmica medida. **Lição transferível: uma premissa reutilizada em três lugares é uma premissa que
@@ -5244,3 +6407,140 @@ novo.** Cinco itens.
     Preferência derivada: **medida de ocupação em vez de instante de travessia**, porque a primeira
     é soma de Riemann com erro limitado por `n_travessias × Δt` e a segunda não converge para nada
     quando o sinal oscila. Seção 7.1.
+
+### Decisões da revisão (f) — 2026-08-09, o modelo de contato refeito
+
+> **Escopo.** Esta revisão substitui o núcleo das Seções 4.3 a 4.10. Três decisões de projeto foram
+> tomadas fora deste documento e não estão em aberto — detectar no primeiro contato, portões físicos
+> determinísticos, ricochete com restituição parcial. O que esta revisão faz é fixar a forma exata
+> dessas três, corrigir cinco erros na proposta submetida, e registrar as falhas do modelo anterior
+> no lugar onde foram escritas.
+
+59. **A detecção passa do MÍNIMO para a PRIMEIRA RAIZ, e é isso que faz o resto existir.** `t_c` é
+    a menor raiz de `|dr + t dv|² = R²`, na forma racionalizada `2c/(-b + sqrt(D))` — a canônica
+    cancela catastroficamente quando `4ac << b²`, que é todo encontro rápido. O conjunto de eventos
+    é **preservado** (demonstrado por casos em 4.3, discrepância só na borda de medida nula
+    `q(h) = 0`) e o argumento anti-tunelamento de 4.4.2 sobrevive intacto. Seção 4.3.
+60. **`u . n < 0` em `t*` era uma AFIRMAÇÃO FALSA deste documento, e ela invalidava dois canais.**
+    Num mínimo interior `sep . u = 0` **por definição de mínimo**, logo `u . n = 0` e
+    `J = 2 mu (u.n) n = 0`: o canal elástico era a **identidade**, medido `|cos(u,n)| <= 5.4e-6` em
+    `8258` casos **[M]**, `21%` dos eventos da linha de base **[M]**. E `u'` "alinhado com o eixo do
+    impacto" na fragmentação saía **perpendicular** a ele. Em `t_c` a desigualdade é estrita, e
+    `n ∥ dr(t_c)` — de onde `L` exatamente conservada no ricochete e `ΔL` em forma fechada em todo
+    canal. Seções 4.3, 4.5.
+61. **As Seções 4.5 e 4.9 se CONTRADIZIAM, e a implementação seguiu a que era código.** 4.5
+    declarava reposicionamento *ad hoc* **proibido**; 4.9(3) recolocava os fragmentos a `R_a + R_b`
+    das massas novas, até `1.44x` a separação real **[M]**. 4.9.1 registrou a tensão e a resolveu
+    contabilizando o `ΔU` — o que não responde a uma proibição sobre **posições**. A proibição fica
+    em vigor e passa a ser **cumprida**: nenhum canal reposiciona. Seção 4.5.
+62. **O mapa estocástico é APOSENTADO inteiro.** `regime_probabilities()`, `x`, `v_coh`,
+    `v_coh_from_state()`, `CollisionModel.v_coh`, `MAP_ELASTIC_WEIGHT`, `MAP_X_CLAMP`, Seções 4.6-H,
+    4.7, 4.7.1, 4.8, `INV-25`, `INV-26`. Motivo medido: `v_coh = V_CHAR = 3.28 m/s` é a escala
+    virial **global**, os contatos ocorrem a `12`–`24 m/s` no núcleo, logo `x ~ 13`–`53` e
+    `p_frag ~ 0.81`–`0.95` **[M]**. **`INV-25` verificava a boa formação do mapa com oito cláusulas
+    e nada verificava a faixa de entrada** — a suíte era exaustiva sobre a metade errada do problema.
+    Seções 4.6-H, 4.7, 4.8.
+63. **`v_esc` usa a distância SUAVIZADA. Correção à proposta, e não é cosmética.** O portão 1 afirma
+    algo sobre a dinâmica **desta** simulação, que é de Plummer: `2.2881 m/s` contra `5.1668 m/s`
+    newtoniano para o par `m_bar`–`m_bar` — fator `2.258` em velocidade, `5.099` em energia **[T]**.
+    Regra geral derivada: *o que decide o que os corpos farão usa `d~`; o que descreve o que os
+    corpos são usa a distância newtoniana.* `E_lig` é do segundo tipo e continua newtoniana.
+    Seção 4.6.1.
+64. **Os dois portões NÃO são exclusivos, e a precedência da fusão é normativa.** Exclusivos para
+    `q <= 6.237`; sobrepostos acima **[T]**, disparando juntos em `2.3%` (frio) e `12.3%` (Salpeter)
+    dos contatos reais **[M]**. Precedência da fusão porque um par que termina ligado termina como um
+    corpo só, independentemente de o projétil ter se estilhaçado. Seção 4.6.3.
+65. **A ressalva do `fragmentation_probe.py` sobre `E_lig` NÃO basta mais.** Ela bastava enquanto
+    `E_lig` era régua de diagnóstico; virou **portão**. Três exigências a substituem: coeficiente
+    `K_BIND` explícito e configurável, registro de que o `R` de `E_lig` é parâmetro de **seção de
+    choque** (logo o nível do portão escala com `1/chi`, e `chi = 0.1` o torna `10x` maior que
+    `chi = 1` o tornaria, **[A]** sem medição que o feche), e proibição de qualquer asserção sobre
+    limiares de disrupção. Seção 4.6.2.
+66. **A revisão REINTRODUZ a escala de escape local ao par, que 4.9.1 havia VETADO. O veto está
+    retratado, e o mecanismo que ele descrevia continua real.** `v_esc` cresce de `2.29` a
+    `104 m/s` entre `1` e `10^4 m_bar` **[T]**: corpos grandes fundem cada vez mais, `2 -> 1`, com
+    estado absorvente. Três coisas verdadeiras ao mesmo tempo: o veto acertou a consequência, errou
+    a resposta (preferia um critério *dimensionalmente certo e localmente errado* — frase da própria
+    4.9.1, escrita e depois ignorada), e a decisão sobre o runaway já fora tomada em 4.13.5.
+    Alavanca autorizada, única: **elevar `chi`**. Seção 4.6.4.
+67. **Os sinais do impulso de ricochete na proposta estavam TROCADOS.** A forma submetida empurrava
+    `i` **na direção de** `j`. Correto: `Delta v_i = +(1+e) mu u_n n/m_i`, `Delta v_j = -(1+e) mu u_n
+    n/m_j`, que em `e = 1` é bit a bit o mapa já implementado — **o código estava certo e a proposta
+    estava errada**. `P` e `L` exatos para qualquer `e`; `ΔU = 0` exato; `E_int += (1/2) mu (1-e²)
+    u_n²`. `e = 0` é **proibido** (par pegajoso). Seção 4.9(C).
+68. **O ricochete dissipativo é um FUNIL para a fusão, não um moinho.** Encontros repetidos perdem
+    `(1-e²)` da energia normal a cada contato, `|u|` decresce, e o portão 1 acaba por disparar —
+    um par ligado em contato tem `|u| < v_esc` por definição. A cascata termina. **[T]** Seção 4.9(C).
+69. **A desigualdade `R_a + R_b < R_i + R_j` da proposta é FALSA, e a condição exata é
+    `m_lasca < m_corpo_menor`.** Com `R ∝ m^(1/3)`, `(M-f)^(1/3) + f^(1/3)` é unimodal e vale
+    exatamente `1 + (1/q)^(1/3)` em `f = 1/q`, logo a desigualdade `<=> f < 1/q`. Medido: `f_max` de
+    `0.5` (`q=2`) a `0.00105` (`q=949`) **[M]**. Com `FRAG_CHIP_MAX = 0.5` e razões até `949:1`,
+    falha por três ordens; até o piso `0.01` proposto falha. Seção 4.9(D.1).
+70. **A "fragmentação" lasca o corpo MENOR, não o maior — e o canal chama-se EROSÃO.** Três razões,
+    todas medidas: (i) `E_lig ∝ m^(5/3)`, e para `q = 949` o limiar do projétil é `91500x` menor —
+    gatilhar pelo maior é afirmar que um seixo estilhaça uma montanha e sai inteiro, que é
+    **literalmente o defeito 3** da lista; (ii) lascar o maior daria salto de massa por slot de
+    `473.5x` em `q = 949` **[T]**, pior que o `1.207` medido que motivou a revisão **[M]**;
+    (iii) erodir o menor torna a desigualdade de (69) um **teorema** por Schur-concavidade de
+    `sum m^(1/3)`, sem cota alguma, verificado a `-2.2e-13` sobre `q ∈ [1,2000]` **[M]**. O nome muda
+    por obrigação: num mapa `2 -> 2` **os detritos não têm para onde ir**, logo o canal só pode
+    transferir massa, nunca ejetá-la. Seção 4.9(D).
+71. **Sobreposição pós-evento NÃO é condição física, e o invariante proposto está enfraquecido.** Em
+    `chi = 0.1` o raio de contato é `5x` menor que `eps`: a força é de Plummer em toda separação,
+    não há força de contato nem energia de compressão. E o enunciado forte é falso de qualquer modo
+    (a fusão cria `R(M)` maior; o ramo `c <= 0` **começa** sobreposto). O que substitui é
+    `u' . n > 0` (`INV-34`), mais `INV-35` na forma "nenhum par simultaneamente sobreposto **e** se
+    aproximando". Seção 4.9(D.2).
+72. **A erosão é o ricochete MAIS um custo, e é essa construção que remove a descontinuidade no
+    portão.** A proposta punha `u'` ao longo de `+n` com módulo de energia, descartando a componente
+    tangencial e entregando, no limite `f_chip -> 0`, um choque **perfeitamente elástico** logo
+    acima de um portão abaixo do qual se dissipa `36%`: cruzar o limiar de disrupção **reduziria** a
+    dissipação. Normativo: aplicar a restituição primeiro (`u_r`), depois o custo, herdando a direção
+    de `u_r`. Consequência colateral: a inclinação transversal sorteada **fica desnecessária** —
+    a saída já é não radial, por origem física em vez de sorteio. Seções 4.9(D), 4.7.1.
+73. **Guarda de energia obrigatória na erosão.** Sem ela `T' > 0` exige `e² > FRAG_CHIP_MAX`, e `e`
+    é ajustável: com `e = 0.5` tem-se `0.25 < 0.5` e `T'` fica **negativo** **[T]**.
+    `E_custo = min(f_chip E_lig, 0.9 T_r)` com `f_chip` recalculado torna o canal seguro para todo
+    `e ∈ (0,1]`. Garantias fechadas: `|u'|/|u| >= 0.432` (contra `0.065` medido no modelo antigo
+    **[M]**) e fragmentos **mais próximos**, não mais afastados. Seção 4.9(D.3).
+74. **O fator de assimetria `(1 - q^(-5/3))` não é enfeite: ele impede quebra de simetria por índice
+    no exato regime da campanha.** `q^(-5/3) = E_lig(P)/E_lig(G)`. A campanha do estágio 3 roda com
+    massas **iguais**, onde `q = 1` e o "menor" sairia de um desempate de índice; sem o fator, a
+    direção do transporte de massa seria decidida pela ordem dos slots. Seção 4.9(D.4).
+75. **CONSEQUÊNCIA ESTRUTURAL declarada antes da execução: nenhum canal reduz `max_i m_i`.** Fusão
+    aumenta, erosão aumenta, ricochete mantém. É o preço de exigir, ao mesmo tempo, continuidade de
+    massa por slot e física de impacto com o sinal certo dentro de um mapa `2 -> 2` sem terceiro
+    slot — não é apresentado como melhoria. Alavanca pré-declarada, **só** se `INV-31(C1)` reprovar:
+    erosão simétrica, com custo declarado. Seção 4.9(D.5).
+76. **A regra de slots passa de ÍNDICE para MASSA.** "O índice menor sempre vence" era
+    determinística e **descontínua**: um slot de `1 m_bar` podia passar a `300 m_bar` porque o seu
+    índice era menor. A nova regra — maior massa recebe o produto de maior massa, empate exato
+    desempata por índice — é as duas coisas. É o invariante `INV-33`, e é o que corresponde ao
+    defeito visto na tela. Seção 4.9(A).
+77. **`E_total = K + U + E_int` "conservada por construção" era FALSO, e agora está medido.**
+    `62` de `62` eventos vazam; resíduo acumulado **`8.5602%` de `|E_0|`**, pior passe `0.9350%`
+    **[M]**. Não há um único evento em que a conservação alegada se sustente. A estimativa publicada
+    de `1.2e-3 |E_0|` errou por fator **`71`**, porque foi feita em massas comparáveis e o termo
+    escala com a massa movida. Seção 4.10.
+78. **Uma regra única substitui as três formas fechadas: `E_int += -(ΔK + ΔU)`, com `ΔU` incluindo
+    o termo de campo, exato, `O(N)` por evento.** A conservação passa a ser identidade algébrica —
+    `ΔK + ΔU - (ΔK + ΔU) = 0` — **porque nenhum termo é omitido**, e `TOL-EVENT-CONS` volta de
+    `1e-5` a `1e-12` em fp64. O ricochete continua `O(1)`: `ΔU = 0` **exato**, e a soma `O(N)` não
+    deve ser executada. A correção de sinal de 2026-08-07 (b) fica automaticamente incorporada:
+    não há sinal a errar quando só existe a regra geral. Seção 4.10.
+79. **A avaliação por evento é contra o ESTADO CORRENTE do passe, não contra o início do passo.**
+    Pares aceitos são disjuntos em **slots** mas não em **influência**: o `ΔU` de campo do evento
+    `k` soma sobre corpos que um evento anterior do mesmo passe pode ter alterado. Sem isso, `INV-36`
+    falha **só** nos passos com `n_events > 1` — que é o seu diagnóstico. Seção 4.5, item 3.
+80. **O modelo de contato é DETERMINÍSTICO: zero sorteios, em todo canal.** `INV-32` passa de
+    "exatamente `2 n_events`" para "o estado do `Generator` é bit a bit idêntico antes e depois de
+    qualquer passe" — a forma mais forte e mais barata do mesmo requisito, e ela torna `INV-19(c)`
+    trivialmente atingível. `COLLISION_SEED` permanece no contrato e fica sem consumidor.
+    Seção 4.7.1.
+81. **Lição transferível, e é a que este documento mais precisa registrar: cinco conservações
+    exatas não estabelecem que o mapa faz o que a prosa em volta dele diz que ele faz.** `INV-20`
+    passava perfeitamente contra `J = 0` — todas as grandezas se conservavam porque nenhuma mudava.
+    `INV-22` provava massa, `P`, `T_cm`, `K` e `sum m r` exatos de um canal cujo corte de massa
+    ignorava os corpos que colidiram. **Um teste de conservação precisa de um companheiro que
+    verifique que algo mudou**, e é isso que as cláusulas de não trivialidade de `INV-20` e
+    `INV-38(2b)` acrescentam. Seções 4.9(1), 4.9(3), 6.
