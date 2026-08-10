@@ -1,49 +1,43 @@
 """
-Diagnostic instrumentation for the fragmentation channel.
+Diagnostic instrumentation for the erosion channel.
 
 Written to answer a specific observation: watching scripts/realtime.py with --collisions, a
 body appears to split off beside the dominant body, at a distance that looks wrong, and
-vanishes again a few steps later. This script establishes whether that is a rendering
-artifact or the collision model, and measures four things the specification never bounds.
+vanishes again a few steps later. It established that this was the collision model and not a
+rendering artifact, and its measurements are what the revision (f) amendment was written
+against. Since that amendment it has changed role -- from diagnosing the retired
+uniform-split fragmentation map to verifying the gate that replaced it.
 
 It changes no physics. It replicates integrators._step_velocity_verlet_collision step by
 step -- half-kick, detect, pair_disjoint, resolve, half-kick -- so that every accepted event
 can be inspected immediately before and after resolve(). The trajectory it produces is the
 same one integrate() produces; the loop is unrolled only so the events are observable.
 
-The four measurements:
+What it measures now:
 
-  1. PLACEMENT GEOMETRY. resolve() places the two fragments exactly in contact using their
-     NEW contact radii, R = R_ref (m/m_bar)^(1/3). Because that is concave in m, an even
-     split of an UNEQUAL pair gives R_a + R_b larger than the colliding pair's own contact
-     separation -- the fragments are pushed further apart than the bodies ever were. Closed
-     form, in the incoming mass ratio q = m_big/m_small and the split f:
-
-         (R_a + R_b) / (R_i + R_j) = [f^(1/3) + (1-f)^(1/3)]
-                                     / [(q/(1+q))^(1/3) + (1/(1+q))^(1/3)]
-
-     with a ceiling of 2^(2/3) = 1.5874 as q -> inf, f -> 1/2. The specification notes only
-     that neither R_a+R_b >= R_i+R_j nor its converse holds universally (Sec. 4.9, as an
-     aside about the sign of the E_int increment); it never draws the geometric conclusion.
-
-  2. SEPARATION SPEED. u' = |u| sqrt(mu/mu') conserves the CM-frame kinetic energy exactly.
-     For an unequal pair split evenly that makes the fragments separate far SLOWER than the
-     impact:
-
-         |u'| / |u| = sqrt( [q/(1+q)^2] / [f(1-f)] )
-
-     The specification's claim that the placement "impede recolisão imediata" rests on the
-     SIGN of u' only. Nothing anywhere checks that its magnitude clears the pair.
-
-  3. RE-EVENTS ON THE SAME PAIR. Whether the two slots meet again, how many steps later,
-     and through which channel. The approach guard (dr.dv < 0) blocks a pair only while it
-     is still separating; once mutual gravity turns it around the pair is a candidate again,
-     and it was left exactly touching.
-
-  4. ENERGY GATE. Whether the event had the energy to do what the model says it did, as
-     T_cm / E_bind with E_bind = (3/5) G m^2 / R for the larger body. Read the caveat in
-     the report: the bodies are point masses with no internal structure, so E_bind is a
+  1. THE GATE, T_n / E_lig(smaller body). This is the quantity that decides erosion in Sec.
+     4.6 revision (f), so it must exceed 1 in every row of the output -- a row below 1 means
+     the gate is not the thing firing. Two substitutions that were live defects in the retired
+     model are worth keeping in view: T_cm instead of T_n let grazing passes through, because
+     only the NORMAL component of the impact does the damage; and the LARGER body's threshold
+     is smaller by q^(5/3), which was 91500x at the q = 949 this probe measured. The caveat
+     stands unchanged -- the bodies are point masses with no internal structure, so E_lig is a
      yardstick imported from outside the model, not a quantity the simulation contains.
+
+  2. PLACEMENT GEOMETRY, as a check that nothing is repositioned. Erosion applies a rigid
+     displacement to the pair and leaves the separation alone, so the measured ratio carries
+     no free parameter to disagree with. The retired map placed the fragments at the sum of
+     their NEW contact radii, up to 1.441x the pair's own separation -- that number is the
+     baseline this column exists to stay away from.
+
+  3. SEPARATION SPEED. Erosion transfers mass from the smaller body to the larger, so mu falls
+     and |u'| rises even though T' = T_r - E_custo is smaller than the impact. FRAG_CHIP_MAX
+     bounds the amplification at sqrt(2). The retired map instead made 65.8% of events separate
+     SLOWER than they arrived, down to 0.065x, which is why they fell back and re-collided.
+
+  4. RE-EVENTS ON THE SAME PAIR. Whether the two slots meet again, how many steps later, and
+     through which channel. The approach guard (dr.dv < 0) blocks a pair only while it is
+     still separating; once mutual gravity turns it around the pair is a candidate again.
 
 Usage:
 
@@ -84,10 +78,15 @@ RESULTS_DIR = os.path.join(os.path.dirname(__file__), "..", "results", "2026")
 
 
 def results_path(cold: bool) -> str:
-    """Tagged by initial condition. The two protocols are different measurements of different
-    populations, so a fixed filename would let one silently replace the other."""
+    """Tagged by initial condition AND by model revision. The two protocols are different
+    measurements of different populations, so a fixed filename would let one silently replace
+    the other -- and since revision (f) the same is true across models. The files without the
+    revision tag hold the retired uniform-split map's diagnostic: 114 spectrum and 2041 cold
+    fragmentation events, the evidence the (f) amendment was written against. Overwriting them
+    with runs of the model that replaced them would destroy the before side of every comparison
+    in this repository, so the new runs get their own name."""
     return os.path.join(
-        RESULTS_DIR, f"fragmentation_probe_{'cold' if cold else 'spectrum'}.csv"
+        RESULTS_DIR, f"fragmentation_probe_{'cold' if cold else 'spectrum'}_contato.csv"
     )
 
 
@@ -95,18 +94,18 @@ RE_EVENT_WINDOW = 200  # steps; how far back to look for the same pair meeting a
 
 
 # ==============================================================================
-# Closed forms, so the report can state what the measurement should be
+# Closed forms
 # ==============================================================================
-def placement_ratio(q: float, f: float) -> float:
-    """(R_a + R_b) / (R_i + R_j) for incoming mass ratio q >= 1 and split f."""
-    return (f ** (1 / 3) + (1 - f) ** (1 / 3)) / (
-        (q / (1 + q)) ** (1 / 3) + (1 / (1 + q)) ** (1 / 3)
-    )
-
-
-def speed_ratio(q: float, f: float) -> float:
-    """|u'| / |u| = sqrt(mu/mu') for incoming mass ratio q >= 1 and split f."""
-    return math.sqrt((q / (1 + q) ** 2) / (f * (1 - f)))
+# RETIRED 2026-08-09 (f) with the model they described: placement_ratio(q, f) and
+# speed_ratio(q, f). Both were exact for the uniform-split fragmentation map -- the first
+# gave (R_a+R_b)/(R_i+R_j) from the split alone, the second |u'|/|u| = sqrt(mu/mu'). Erosion
+# is not that map: the split is set by the impact energy rather than drawn, the chip comes off
+# the smaller body rather than the pair being repartitioned, and |u'| is fixed by T' = T_r -
+# E_custo rather than by conserving T_cm. Keeping them would have been the error the physicist
+# named when retiring ENS_EINT_MAG_RANGE -- a prediction registered against a model that was
+# then replaced does not survive the replacement. The measured columns stay; only the
+# closed-form companions and their agreement check go, because there is nothing left for the
+# measurement to agree WITH until someone derives the erosion forms.
 
 
 def contact_radius(m: float, r_ref: float) -> float:
@@ -182,7 +181,14 @@ def run(n, n_steps, dt, softening, seed, collision_seed, cold, virial_ratio):
 
             # Channel is inferred from the mass bookkeeping, not from the counts resolve()
             # returns: those are aggregates and cannot be attributed to a pair.
-            if m_b == 0.0:
+            # Either slot can be the dead one since revision (f): the slot rule went from
+            # "lower index keeps the merged body" to "larger MASS keeps it", so the dead slot
+            # is whichever held the lighter body and that is not always j. Testing only m_b,
+            # which was correct under the old rule, silently relabelled every merger whose
+            # lighter body sat at slot i as an erosion -- and those rows then reported
+            # f = 0 exactly, |u'|/|u| = 0 exactly (both slots carry v_cm after a merger) and a
+            # gate ratio far below 1, which reads as the erosion gate firing where it must not.
+            if m_a == 0.0 or m_b == 0.0:
                 channel = "merge"
             elif abs(m_a - m_i) <= 1e-12 * m_i:
                 channel = "ricochet"
@@ -230,11 +236,9 @@ def run(n, n_steps, dt, softening, seed, collision_seed, cold, virial_ratio):
                     "old_contact_sep": old_contact,
                     "new_contact_sep": new_contact,
                     "placement_ratio": new_contact / old_contact,
-                    "placement_ratio_closed_form": placement_ratio(q, f),
                     "u": u,
                     "u_prime": torch.linalg.norm(post.v[j] - post.v[i]).item(),
                     "speed_ratio": torch.linalg.norm(post.v[j] - post.v[i]).item() / u,
-                    "speed_ratio_closed_form": speed_ratio(q, f),
                     "t_cm_over_ebind_big": t_cm / binding_energy(m_big, model.r_ref),
                     "t_cm_over_ebind_pair": t_cm / binding_energy(big_m, model.r_ref),
                     # The gate actually applied. Must be > 1 for every row in this file.
@@ -327,15 +331,6 @@ def report(result, n, n_steps, dt):
     print(f"  T_cm below E_bind of the body being split        : {starved}/{len(events)} "
           f"({100 * starved / len(events):.0f}%)")
 
-    # The closed forms are printed against the measurement rather than asserted, so a future
-    # change to resolve() shows up here as a disagreement instead of passing silently.
-    worst_placement = max(
-        abs(e["placement_ratio"] - e["placement_ratio_closed_form"]) for e in events
-    )
-    worst_speed = max(abs(e["speed_ratio"] - e["speed_ratio_closed_form"]) for e in events)
-    print()
-    print("  closed form vs measurement, worst absolute disagreement over all events:")
-    print(f"    placement ratio {worst_placement:.2e}      |u'|/|u| {worst_speed:.2e}")
 
     print()
     print("TEN EVENTS ON THE HEAVIEST BODIES")
