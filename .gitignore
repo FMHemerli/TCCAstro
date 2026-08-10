@@ -17,3 +17,6 @@ __pycache__/
 
 # figures/ and results/ are committed on purpose: the README and the
 # reproducibility claims depend on them being in the repository.
+
+# Estado local de agentes e sessao, nunca versionado
+.claude/
