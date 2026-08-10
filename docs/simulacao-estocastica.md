@@ -1607,6 +1607,14 @@ condição de ligação do par no potencial que a simulação integra, sem parâ
 (Seção 4.6.2). Consequência normativa para o relatório: **as frações de canal realizadas são uma
 saída dos portões, jamais uma predição física.**
 
+> **Medido 2026-08-10, espectro Salpeter [M]:** `73%` ricochete / `9%` fusão / `18%` erosão,
+> contra `8.8 / 45.6 / 45.6` previstos acima. Cobertura acima de `5%` nos três canais, que era a
+> única coisa que a predição podia falhar; frações e ordem, não. Causa mecânica: a reclassificação
+> usou contatos de um modelo onde nada dissipava, e com `e = 0.8` cada ricochete remove `36%` da
+> energia normal, acumulando a população na faixa intermediária — que é o próprio canal de
+> ricochete. Pelo parágrafo acima isto é uma saída dos portões, não uma tese refutada, e a
+> anotação para aqui.
+
 ### 4.6-H `[HISTÓRICO — APOSENTADO em 2026-08-09 (f)]` Parâmetro de regime `x`
 
 > **APOSENTADA.** `x`, `v_coh`, `v_coh_from_state()`, `CollisionModel.v_coh` e `COH_VELOCITY_FACTOR`
