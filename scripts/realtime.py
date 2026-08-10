@@ -451,7 +451,31 @@ class Viewer:
         # to be computed and frozen here the way t_ff and dt above are.
         self.n_live = self.n
         if self.collisions_enabled:
+            # Both the softening and the contact radius are ABSOLUTE scales tied to
+            # config.SOFTENING, while --radius is free. Shrinking the cloud without shrinking
+            # them puts the whole system inside the softened core and makes the contact sphere a
+            # large fraction of the cloud -- and since R grows as m^(1/3) while the fusion gate's
+            # v_esc grows as sqrt(m), a body that starts winning swallows neighbours from further
+            # and further away. Measured at --n 100 --radius 0.1 --cold: after 4000 steps the
+            # largest contact radius is 10.4% of the cloud radius and mergers fire across 15% of
+            # it, which reads on screen as bodies vanishing into the dominant mass from an absurd
+            # distance. That is the parameters, not a defect, so this warns and continues.
             r_ref = self.chi * config.SOFTENING
+            soft_frac = config.SOFTENING / self.radius
+            contact_frac = r_ref / self.radius
+            if soft_frac > 0.1 or contact_frac > 0.01:
+                print(
+                    f"WARNING: --radius {self.radius:g} is small against the fixed scales.\n"
+                    f"  softening / radius      = {soft_frac:.1%}"
+                    f"{'   <- gravity is unresolved everywhere' if soft_frac > 0.1 else ''}\n"
+                    f"  contact radius / radius = {contact_frac:.1%}"
+                    f"{'   <- grows as m^(1/3); expect runaway accretion' if contact_frac > 0.01 else ''}\n"
+                    f"  Both scales come from config.SOFTENING = {config.SOFTENING:g}, which does "
+                    f"not follow --radius.\n"
+                    f"  Lower --chi to shrink the contact sphere, or keep --radius near the "
+                    f"default {config.SPHERE_RADIUS:g}.",
+                    file=sys.stderr,
+                )
             self.collision_model = collisions.CollisionModel(
                 r_ref, self.mass, e_restitution=self.restitution
             )
