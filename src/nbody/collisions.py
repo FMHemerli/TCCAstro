@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import math
 from dataclasses import dataclass, field
 
 import torch
@@ -14,26 +13,31 @@ from .state import State
 class CollisionModel:
     # r_ref, m_bar keep their original relative order and stay positional-or-keyword, so the
     # pre-existing construction convention CollisionModel(r_ref, m_bar) is preserved bit for
-    # bit. v_coh carries no sentinel/default (Sec. 9.1.1: "em m/s, sem sentinela; o chamador o
-    # computa") and is therefore kw_only=True instead of being placed first: a plain
-    # (non-kw_only) mandatory field would have to precede the two defaulted ones, which would
-    # silently rebind existing positional calls (CollisionModel(x, y) would bind x -> v_coh,
-    # y -> r_ref instead of raising). kw_only fields are exempt from the dataclass
-    # no-default-before-default ordering rule and from positional binding entirely, so this
-    # is the one placement that adds the mandatory field without touching the two that
-    # already existed. seed is new too and kw_only for the same reason, though it is
-    # defaulted so the choice is lower-stakes.
+    # bit. The deterministic-contact fields (e_restitution, k_bind, chip_coeff, chip_max,
+    # energy_max) and seed are kw_only with defaults, per Sec. 8/9.1.1 (revision (f)).
     r_ref: float = config.R_REF_DEFAULT
     m_bar: float = config.PARTICLE_MASS
-    v_coh: float = field(kw_only=True)
+    e_restitution: float = field(default=config.E_RESTITUTION, kw_only=True)
+    k_bind: float = field(default=config.K_BIND, kw_only=True)
+    chip_coeff: float = field(default=config.FRAG_CHIP_COEFF, kw_only=True)
+    chip_max: float = field(default=config.FRAG_CHIP_MAX, kw_only=True)
+    energy_max: float = field(default=config.FRAG_ENERGY_MAX, kw_only=True)
     seed: int = field(default=config.COLLISION_SEED, kw_only=True)
+
+    def __post_init__(self) -> None:
+        if not (0.0 < self.e_restitution <= 1.0):
+            raise ValueError(
+                "CollisionModel: e_restitution must lie in (0, 1], got "
+                f"{self.e_restitution!r} (Sec. 4.9(A): e = 0 is forbidden)"
+            )
 
 
 @dataclass(frozen=True)
 class CollisionCandidates:
     i: torch.Tensor
     j: torch.Tensor
-    t_star: torch.Tensor
+    t_c: torch.Tensor
+    u_n: torch.Tensor
     rel_speed: torch.Tensor
     contact_radius_sum: torch.Tensor
 
@@ -46,7 +50,8 @@ class CollisionCandidates:
 class AcceptedPairs:
     i: torch.Tensor
     j: torch.Tensor
-    t_star: torch.Tensor
+    t_c: torch.Tensor
+    u_n: torch.Tensor
     rel_speed: torch.Tensor
     contact_radius_sum: torch.Tensor
     f_reject: float
@@ -67,7 +72,8 @@ def _empty_candidates(dtype: torch.dtype, device: torch.device) -> CollisionCand
     return CollisionCandidates(
         i=empty_i,
         j=empty_i.clone(),
-        t_star=empty_f,
+        t_c=empty_f,
+        u_n=empty_f.clone(),
         rel_speed=empty_f.clone(),
         contact_radius_sum=empty_f.clone(),
     )
@@ -78,6 +84,13 @@ def detect(state, dt: float, model: CollisionModel) -> CollisionCandidates:
     the O(N^2) pass never allocates a full N x N intermediate at once. state.v is taken as
     the relative velocity to sweep with (Sec. 4.3: exact for the velocity-Verlet drift when
     v is the mid-step velocity v^(n+1/2); the caller is responsible for passing that state).
+
+    Sec. 4.3, revision (f): per-pair contact time t_c is the first root of the exact-contact
+    quadratic |sep(t)| = R, not the closest-approach clamp of the previous model. Guards, in
+    order: (1) a = dv.dv > 0 strict; (2) dr.dv < 0 strict (approaching); (3) c = dr.dr - R^2
+    <= 0 -> already overlapping, t_c = 0, D is not evaluated; (4) else D = b^2 - 4ac > 0
+    strict, t_c = 2c / (-b + sqrt(D)) -- the canonical form (-b - sqrt(D)) / (2a) is
+    catastrophically unstable when 4ac << b^2 and is never used; (5) 0 <= t_c <= dt.
     """
     r = state.r
     v = state.v
@@ -98,6 +111,7 @@ def detect(state, dt: float, model: CollisionModel) -> CollisionCandidates:
     i_chunks: list[torch.Tensor] = []
     j_chunks: list[torch.Tensor] = []
     t_chunks: list[torch.Tensor] = []
+    un_chunks: list[torch.Tensor] = []
     speed_chunks: list[torch.Tensor] = []
     r_sum_chunks: list[torch.Tensor] = []
 
@@ -114,45 +128,63 @@ def detect(state, dt: float, model: CollisionModel) -> CollisionCandidates:
         upper = row_global.unsqueeze(1) < idx.unsqueeze(0)  # keep j > i only, once per pair
         pair_live = live_i.unsqueeze(1) & live.unsqueeze(0)
 
+        a = (dv * dv).sum(dim=-1)
         dr_dot_dv = (dr * dv).sum(dim=-1)
-        dv_sq = (dv * dv).sum(dim=-1)
-
-        # Sec. 4.3, normative guards: (i) approaching only, dr.dv < 0 at step start; a pair
-        # with dv == 0 has dr.dv == 0 exactly and is excluded by this test before the
-        # degenerate division below is ever selected. (ii) |dv|^2 == 0 -> t* = 0.
-        approaching = dr_dot_dv < 0.0
-        candidate_mask = upper & pair_live & approaching
-
-        # No where-guard on the division: dv_sq == 0.0 iff dv == (0, 0, 0) exactly (a sum of
-        # three non-negative squares vanishes only if every term does), and IEEE754 squaring
-        # of a signed zero is always +0. At such a position dr_dot_dv is itself a sum of
-        # signed zeros (dr_c * 0.0), so it compares equal to, never less than, 0.0 -- meaning
-        # `approaching` is already False there and candidate_mask excludes it regardless of
-        # this division's result. The unguarded 0/0 = nan at that position propagates through
-        # clamp, through sep = dr + t_star*dv (nan * (+0) = nan), and into sep_sq < r_sum^2
-        # (any comparison against nan is False), so in_contact is also False there -- the
-        # position was never going to be selected by torch.nonzero(collide) either way. At
-        # every position where dv_sq != 0.0 (every real candidate) this is the same division
-        # the guarded form used to perform, bit for bit -- the guard only ever changed the
-        # value at positions that are provably never selected.
-        raw_t_star = -dr_dot_dv / dv_sq
-        t_star = raw_t_star.clamp(min=0.0, max=dt)
-
-        sep = dr + t_star.unsqueeze(-1) * dv
-        sep_sq = (sep * sep).sum(dim=-1)
+        b = 2.0 * dr_dot_dv
+        dr_sq = (dr * dr).sum(dim=-1)
 
         r_sum = radii_i.unsqueeze(1) + radii.unsqueeze(0)
-        in_contact = sep_sq < (r_sum * r_sum)
+        c = dr_sq - r_sum * r_sum
 
-        collide = candidate_mask & in_contact
-        rows, cols = torch.nonzero(collide, as_tuple=True)
+        guard_a = a > 0.0
+        guard_approach = dr_dot_dv < 0.0
+        overlapping = c <= 0.0
+
+        d_disc = b * b - 4.0 * a * c
+        guard_disc = d_disc > 0.0
+        # Masked-safe sqrt/division: entries where guard_disc is False (D <= 0, including all
+        # overlapping-branch entries where c <= 0 makes D >= b^2 >= 0 trivially true, and all
+        # non-candidate entries) never reach t_c_root through candidate_mask below, so garbage
+        # produced by the substituted denominator here is discarded, not propagated.
+        sqrt_d = torch.sqrt(torch.clamp(d_disc, min=0.0))
+        denom = -b + sqrt_d
+        denom_safe = torch.where(denom == 0.0, torch.ones_like(denom), denom)
+        t_c_root = 2.0 * c / denom_safe
+
+        t_c = torch.where(overlapping, torch.zeros_like(c), t_c_root)
+        within_h = (t_c >= 0.0) & (t_c <= dt)
+
+        candidate_mask = (
+            upper
+            & pair_live
+            & guard_a
+            & guard_approach
+            & (overlapping | guard_disc)
+            & within_h
+        )
+
+        # Contact normal at t_c (Sec. 4.4): n = sep / d_c, or the continuous extension -u/|u|
+        # when d_c == 0 (head-on contact). guard_a already forces |dv| = |u| > 0 wherever
+        # candidate_mask can be True, so the u/|u| branch never sees a 0/0 among accepted
+        # candidates; entries where it would are masked-safe substituted and discarded below.
+        sep = dr + t_c.unsqueeze(-1) * dv
+        d_c = torch.sqrt((sep * sep).sum(dim=-1))
+        d_c_safe = torch.where(d_c == 0.0, torch.ones_like(d_c), d_c)
+        n_from_sep = sep / d_c_safe.unsqueeze(-1)
+        u_norm_safe = torch.where(a == 0.0, torch.ones_like(a), torch.sqrt(a))
+        n_from_u = -dv / u_norm_safe.unsqueeze(-1)
+        n_hat = torch.where((d_c == 0.0).unsqueeze(-1), n_from_u, n_from_sep)
+        u_n = (dv * n_hat).sum(dim=-1)
+
+        rows, cols = torch.nonzero(candidate_mask, as_tuple=True)
         if rows.numel() == 0:
             continue
 
         i_chunks.append(row_global[rows])
         j_chunks.append(cols)
-        t_chunks.append(t_star[rows, cols])
-        speed_chunks.append(dv_sq[rows, cols].sqrt())
+        t_chunks.append(t_c[rows, cols])
+        un_chunks.append(u_n[rows, cols])
+        speed_chunks.append(a[rows, cols].sqrt())
         r_sum_chunks.append(r_sum[rows, cols])
 
     if not i_chunks:
@@ -161,16 +193,17 @@ def detect(state, dt: float, model: CollisionModel) -> CollisionCandidates:
     return CollisionCandidates(
         i=torch.cat(i_chunks),
         j=torch.cat(j_chunks),
-        t_star=torch.cat(t_chunks),
+        t_c=torch.cat(t_chunks),
+        u_n=torch.cat(un_chunks),
         rel_speed=torch.cat(speed_chunks),
         contact_radius_sum=torch.cat(r_sum_chunks),
     )
 
 
 def pair_disjoint(candidates: CollisionCandidates) -> AcceptedPairs:
-    """Sec. 4.5: sort candidates by the lexicographic key (t*, i, j) -- the (i, j) tie-break
+    """Sec. 4.5: sort candidates by the lexicographic key (t_c, i, j) -- the (i, j) tie-break
     is normative, it is what makes the greedy acceptance reproducible across devices when
-    two candidates share a bit-identical t* (e.g. a symmetric configuration). Greedily
+    two candidates share a bit-identical t_c (e.g. a symmetric configuration). Greedily
     accept in that order, rejecting any candidate that shares a slot with an already
     accepted pair. Runs on host: the acceptance decision for candidate k depends on every
     decision before it in sorted order, so it does not vectorize, and the candidate count is
@@ -178,12 +211,13 @@ def pair_disjoint(candidates: CollisionCandidates) -> AcceptedPairs:
     """
     n_candidates = candidates.n
     if n_candidates == 0:
-        empty_f = torch.empty(0, dtype=candidates.t_star.dtype)
+        empty_f = torch.empty(0, dtype=candidates.t_c.dtype)
         empty_i = torch.empty(0, dtype=torch.int64)
         return AcceptedPairs(
             i=empty_i,
             j=empty_i.clone(),
-            t_star=empty_f,
+            t_c=empty_f,
+            u_n=empty_f.clone(),
             rel_speed=empty_f.clone(),
             contact_radius_sum=empty_f.clone(),
             f_reject=0.0,
@@ -191,7 +225,8 @@ def pair_disjoint(candidates: CollisionCandidates) -> AcceptedPairs:
 
     i_cpu = candidates.i.detach().to("cpu")
     j_cpu = candidates.j.detach().to("cpu")
-    t_cpu = candidates.t_star.detach().to("cpu")
+    t_cpu = candidates.t_c.detach().to("cpu")
+    un_cpu = candidates.u_n.detach().to("cpu")
     speed_cpu = candidates.rel_speed.detach().to("cpu")
     r_sum_cpu = candidates.contact_radius_sum.detach().to("cpu")
 
@@ -219,7 +254,8 @@ def pair_disjoint(candidates: CollisionCandidates) -> AcceptedPairs:
     return AcceptedPairs(
         i=i_cpu[idx_tensor],
         j=j_cpu[idx_tensor],
-        t_star=t_cpu[idx_tensor],
+        t_c=t_cpu[idx_tensor],
+        u_n=un_cpu[idx_tensor],
         rel_speed=speed_cpu[idx_tensor],
         contact_radius_sum=r_sum_cpu[idx_tensor],
         f_reject=f_reject,
@@ -229,36 +265,13 @@ def pair_disjoint(candidates: CollisionCandidates) -> AcceptedPairs:
 @dataclass(frozen=True)
 class CollisionOutcome:
     state: State
-    n_elastic: int
+    n_ricochet: int
     n_merge: int
-    n_fragment: int
+    n_erosion: int
     delta_e_int: float
     delta_l_spin: torch.Tensor
     f_reject: float
     c_coll_max: float
-
-
-def v_coh_from_state(state, radius: float) -> float:
-    # Sec. 4.6 / 9.1.1: v_coh = V_CHAR = sqrt(G M_real / radius). fp64 regardless of
-    # state.dtype, matching scales_from_state's convention for realization-derived scales.
-    m_real = state.m.to(torch.float64).sum().item()
-    return math.sqrt(config.G * m_real / radius)
-
-
-def regime_probabilities(
-    x: torch.Tensor,
-    *,
-    elastic_weight: float = config.MAP_ELASTIC_WEIGHT,
-    x_clamp: float = config.MAP_X_CLAMP,
-) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
-    # Sec. 4.7: (1/x, C, x)/Z, no exp/log. Dtype-generic: computes in whatever dtype x
-    # carries, never branching on it.
-    x_c = x.clamp(min=1.0 / x_clamp, max=x_clamp)
-    z = (1.0 / x_c) + elastic_weight + x_c
-    p_fus = (1.0 / x_c) / z
-    p_el = elastic_weight / z
-    p_frag = x_c / z
-    return p_fus, p_el, p_frag
 
 
 def _cross3(a: torch.Tensor, b: torch.Tensor) -> torch.Tensor:
@@ -268,10 +281,8 @@ def _cross3(a: torch.Tensor, b: torch.Tensor) -> torch.Tensor:
     cz = a[0] * b[1] - a[1] * b[0]
     return torch.stack((cx, cy, cz))
 
-
-def _grav_energy(m1: torch.Tensor, m2: torch.Tensor, d: torch.Tensor, softening: float) -> torch.Tensor:
-    # E_grav(m, m', d) = G m m' / sqrt(d^2 + eps^2), Sec. 4.10.
-    return config.G * m1 * m2 / torch.sqrt(d * d + softening * softening)
+def _softened(d: torch.Tensor, softening: float) -> torch.Tensor:
+    return torch.sqrt(d * d + softening * softening)
 
 
 def resolve(
@@ -282,34 +293,37 @@ def resolve(
     generator,
     softening: float,
 ) -> CollisionOutcome:
-    """Sec. 4.9 (three outcomes), 4.9(0) (slot rule), 4.10 (E_int, L_spin), 4.7.1 (exactly
-    two uniform draws per accepted event, unconditionally, before the channel branch). Pure
-    with respect to long-run accumulators: returns this pass's deltas only. Completes the
-    drift for every slot: non-participants get r += dt*v; participants get advanced dt - t*
-    after their outcome map is applied at t*. state.v is v^(n+1/2), same convention as
-    detect(). `generator` is a numpy.random.Generator (the COLLISION_SEED stream); it is
-    advanced by exactly 2 * accepted.n draws, in AcceptedPairs order (already sorted by
-    (t*, i, j) by pair_disjoint). With accepted.n == 0 the generator is untouched and the
-    result is the plain drift r <- r + dt*v, identity-composed with the drift (Sec. 4.5,
-    INV-30).
-    """
-    r = state.r
-    v = state.v
-    m = state.m
-    device = r.device
+    """Sec. 4.9 (three outcomes, deterministic gate cascade), Sec. 4.9(A) (slot rule), Sec.
+    4.10 (E_int, L_spin, single accounting rule). Pure with respect to long-run accumulators:
+    returns this pass's deltas only. Completes the drift for every slot: non-participants get
+    r += dt*v; participants get advanced dt - t_c after their outcome map is applied at t_c.
+    state.v is v^(n+1/2), same convention as detect(). `generator` is kept in the signature
+    (Sec. 4.7.1, INV-32) and is not consumed: the deterministic gate cascade of revision (f)
+    draws nothing.
 
-    r_new = r + dt * v
-    v_new = v.clone()
-    m_new = m.clone()
+    Sec. 4.5 item 3 (current-state accounting): within one pass, events are processed in
+    accepted order (already (t_c, i, j)-sorted by pair_disjoint); the field term of an event's
+    energy accounting must see positions already updated by earlier events in the same pass.
+    This is tracked per slot as (r_ref, v, m, t_ref), t_ref = 0 at the start of the pass; slot
+    k's position at time t is r_ref_k + (t - t_ref_k) * v_k. Only the two slots touched by an
+    event get r_ref/t_ref rewritten (to their post-event position and t_c); a pair's own r_i,
+    r_j, v_i, v_j at t_c are therefore always identical to what detect() saw, because
+    pair_disjoint guarantees no slot is touched twice in the same pass.
+    """
+    r0 = state.r
+    v0 = state.v
+    m0 = state.m
+    device = r0.device
+    grav_const = config.G
 
     n_events = accepted.n
 
     if n_events == 0:
         return CollisionOutcome(
-            state=State(r=r_new, v=v_new, m=m_new),
-            n_elastic=0,
+            state=State(r=r0 + dt * v0, v=v0.clone(), m=m0.clone()),
+            n_ricochet=0,
             n_merge=0,
-            n_fragment=0,
+            n_erosion=0,
             delta_e_int=0.0,
             delta_l_spin=torch.zeros(3, dtype=torch.float64, device=device),
             f_reject=accepted.f_reject,
@@ -320,162 +334,273 @@ def resolve(
 
     i_list = accepted.i.tolist()
     j_list = accepted.j.tolist()
-    t_list = accepted.t_star.tolist()
+    t_list = accepted.t_c.tolist()
+
+    r_ref = r0.clone()
+    v_cur = v0.clone()
+    m_cur = m0.clone()
+    t_ref = torch.zeros_like(m0)
 
     delta_e_int = 0.0
     delta_l_spin = torch.zeros(3, dtype=torch.float64, device=device)
-    n_elastic = 0
+    n_ricochet = 0
     n_merge = 0
-    n_fragment = 0
+    n_erosion = 0
+
+    n_slots = m0.shape[0]
+    slot_idx = torch.arange(n_slots, device=device)
 
     for k in range(n_events):
         i_idx = i_list[k]
         j_idx = j_list[k]
-        t_star = t_list[k]
-        remaining = dt - t_star
+        t_c = t_list[k]
 
-        m_i = m[i_idx]
-        m_j = m[j_idx]
-        v_i = v[i_idx]
-        v_j = v[j_idx]
-        r_i = r[i_idx]
-        r_j = r[j_idx]
+        m_i = m0[i_idx]
+        m_j = m0[j_idx]
+        v_i = v0[i_idx]
+        v_j = v0[j_idx]
+        r_i = r0[i_idx]
+        r_j = r0[j_idx]
 
         big_m = m_i + m_j
         mu = m_i * m_j / big_m
         u_vec = v_j - v_i
         u_sq = (u_vec * u_vec).sum()
-        t_cm = 0.5 * mu * u_sq
+        u_norm = torch.sqrt(u_sq)
 
-        r_i_star = r_i + t_star * v_i
-        r_j_star = r_j + t_star * v_j
-        dr_star = r_j_star - r_i_star
-        sep_sq = (dr_star * dr_star).sum()
+        r_i_tc = r_i + t_c * v_i
+        r_j_tc = r_j + t_c * v_j
+        dr_tc = r_j_tc - r_i_tc
+        sep_sq = (dr_tc * dr_tc).sum()
+        d_c = torch.sqrt(sep_sq)
 
-        # Sec. 4.9(0.1): exact head-on encounter (zero impact parameter), sep = dr + t* dv is
-        # 0/0. Not a fallback -- it is the continuous extension of n = sep/|sep|: along the
-        # rectilinear approach, sep(t) = -(t* - t) u for t < t*, so
-        # lim_{t -> t*-} sep(t)/|sep(t)| = -u/|u| exactly. Branch condition is exactly
-        # sep_sq == 0.0, no threshold (a threshold would replace a good normal -- accurate to
-        # a few ulp at any nonzero magnitude -- with the fallback, which is strictly worse).
-        # dr == 0 and u == 0 simultaneously is out of contract: Sec. 4.3's dr.dv < 0 guard is
-        # strict, so detect() never emits a u == 0 candidate; only a caller that bypasses
-        # detect() can reach this, and there is no direction in the problem to fall back to.
-        d_ij = torch.sqrt(sep_sq)
-        if sep_sq.item() == 0.0:
-            u_norm = torch.sqrt(u_sq)
+        # Sec. 4.4: n = sep/d_c, or the continuous extension -u/|u| at d_c == 0 (exact
+        # head-on contact). detect()'s guard 1 (a = dv.dv > 0) forces |u| > 0 for every
+        # candidate it emits, so the u == 0 branch below is unreachable through the
+        # detect -> pair_disjoint -> resolve pipeline; it is retained because resolve()'s
+        # own contract (Sec. 4.4 "casos degenerados") requires it to fail loudly for a
+        # caller that bypasses detect() and feeds resolve() a genuinely degenerate pair.
+        if d_c.item() == 0.0:
             if u_norm.item() == 0.0:
                 raise ValueError(
                     "resolve(): degenerate event (i="
-                    f"{i_idx}, j={j_idx}, t*={t_star}) has both zero separation and zero "
+                    f"{i_idx}, j={j_idx}, t_c={t_c}) has both zero separation and zero "
                     "relative velocity at contact; the contact normal is undefined and out "
-                    "of contract (Sec. 4.9(0.1)) -- detect() never emits such a candidate, "
-                    "so this input bypassed detect()"
+                    "of contract -- detect() never emits such a candidate, so this input "
+                    "bypassed detect()"
                 )
             n_hat = -u_vec / u_norm
         else:
-            n_hat = dr_star / d_ij
+            n_hat = dr_tc / d_c
 
-        # Sec. 4.6 (revision 2026-08-07 (b)): the gravitational term v_esc_eff is retracted --
-        # it does not regulate runaway growth, it causes it (v_esc_eff^2 grows with the
-        # merged body's own mass, driving x toward 0 and p_fus toward 1). x now depends only
-        # on the relative speed at contact and the single fixed scale v_coh; mass cancels
-        # completely.
-        x = u_sq / (model.v_coh * model.v_coh)
+        u_n = (u_vec * n_hat).sum()
+        d_tilde_c = _softened(d_c, softening)
 
-        p_fus_t, p_el_t, _ = regime_probabilities(x)
-        p_fus = float(p_fus_t.item())
-        p_el = float(p_el_t.item())
-
-        u1 = float(generator.random())
-        u2 = float(generator.random())
-
-        if u1 < p_fus:
-            # (2) Merger, Sec. 4.9(0)/4.9.
-            n_merge += 1
-            r_c = (m_i * r_i_star + m_j * r_j_star) / big_m
-            v_cm = (m_i * v_i + m_j * v_j) / big_m
-            r_final = r_c + remaining * v_cm
-
-            v_new[i_idx] = v_cm
-            v_new[j_idx] = v_cm
-            r_new[i_idx] = r_final
-            r_new[j_idx] = r_final
-            m_new[i_idx] = big_m
-            m_new[j_idx] = 0.0
-
-            e_grav_mutual = _grav_energy(m_i, m_j, d_ij, softening)
-            event_delta_e = float((t_cm - e_grav_mutual).item())
-            event_delta_l = _cross3(dr_star, u_vec) * mu
-
-        elif u1 < p_fus + p_el:
-            # (1) Elastic, Sec. 4.9(0)/4.9.
-            n_elastic += 1
-            u_dot_n = (u_vec * n_hat).sum()
-            impulse = 2.0 * mu * u_dot_n * n_hat
-            v_i_new = v_i + impulse / m_i
-            v_j_new = v_j - impulse / m_j
-
-            v_new[i_idx] = v_i_new
-            v_new[j_idx] = v_j_new
-            r_new[i_idx] = r_i_star + remaining * v_i_new
-            r_new[j_idx] = r_j_star + remaining * v_j_new
-            # masses unchanged: m_new already carries m_i, m_j via the initial .clone()
-
-            event_delta_e = 0.0
-            event_delta_l = torch.zeros(3, dtype=torch.float64, device=device)
-
+        i_is_big = bool((m_i >= m_j).item())
+        if i_is_big:
+            m_G, m_P = m_i, m_j
         else:
-            # (3) Fragmentation, Sec. 4.9(0)/4.9.
-            n_fragment += 1
-            f = config.FRAG_F_MIN + (1.0 - 2.0 * config.FRAG_F_MIN) * u2
-            m_a = f * big_m
-            m_b = big_m - m_a
-            mu_prime = m_a * m_b / big_m
-            u_prime_mag = torch.sqrt(u_sq) * torch.sqrt(mu / mu_prime)
-            u_prime_vec = u_prime_mag * n_hat
+            m_G, m_P = m_j, m_i
 
-            radii_new = contact_radii(torch.stack((m_a, m_b)), model)
-            r_ab_sum = radii_new[0] + radii_new[1]
+        # Gate 1 (Sec. 4.9, fusion): |u| < sqrt(2 G M / d~_c).
+        v_esc = torch.sqrt(2.0 * grav_const * big_m / d_tilde_c)
+        is_fusion = bool((u_norm < v_esc).item())
 
-            r_c = (m_i * r_i_star + m_j * r_j_star) / big_m
+        if is_fusion:
+            n_merge += 1
+            r_c = (m_i * r_i_tc + m_j * r_j_tc) / big_m
             v_cm = (m_i * v_i + m_j * v_j) / big_m
 
-            r_a = r_c + (m_b / big_m) * r_ab_sum * n_hat
-            r_b = r_c - (m_a / big_m) * r_ab_sum * n_hat
-            v_a = v_cm + (m_b / big_m) * u_prime_vec
-            v_b = v_cm - (m_a / big_m) * u_prime_vec
+            if i_is_big:
+                m_i_new = big_m
+                m_j_new = torch.zeros_like(big_m)
+            else:
+                m_i_new = torch.zeros_like(big_m)
+                m_j_new = big_m
+            r_i_new = r_c
+            r_j_new = r_c
+            v_i_new = v_cm
+            v_j_new = v_cm
 
-            v_new[i_idx] = v_a
-            v_new[j_idx] = v_b
-            r_new[i_idx] = r_a + remaining * v_a
-            r_new[j_idx] = r_b + remaining * v_b
-            m_new[i_idx] = m_a
-            m_new[j_idx] = m_b
+            event_delta_e, event_delta_l = _general_accounting(
+                slot_idx, r_ref, v_cur, m_cur, t_ref, t_c, i_idx, j_idx,
+                m_i, m_j, v_i, v_j, r_i_tc, r_j_tc, mu,
+                m_i_new, m_j_new, v_i_new, v_j_new, r_i_new, r_j_new,
+                softening, grav_const,
+            )
+        else:
+            R_P = contact_radii(m_P, model)
+            e_lig = model.k_bind * grav_const * m_P * m_P / R_P
+            t_n = 0.5 * mu * u_n * u_n
 
-            # Sec. 4.10, sign correction 2026-08-07 (b): E_int += E_grav(after) -
-            # E_grav(before). Derived from the document's own general rule E_int += -(dK+dU)
-            # with dK = 0: if fragmentation deepens the mutual well (E_grav_after >
-            # E_grav_before), U falls, E_mec falls, and that is dissipation, so E_int must
-            # rise -- this expression does; E_grav(before) - E_grav(after) does not.
-            e_grav_before = _grav_energy(m_i, m_j, d_ij, softening)
-            e_grav_after = _grav_energy(m_a, m_b, r_ab_sum, softening)
-            event_delta_e = float((e_grav_after - e_grav_before).item())
-            event_delta_l = _cross3(dr_star, u_vec) * mu
+            # Gate 2 (Sec. 4.9, erosion): T_n > K_BIND G m_P^2 / R_P. m_P, R_P are the
+            # SMALLER body's -- using the larger body's would fragment on grazing encounters.
+            is_erosion = bool((t_n > e_lig).item())
+
+            if is_erosion:
+                n_erosion += 1
+                q = m_G / m_P
+                xi = model.chip_coeff * (t_n / e_lig - 1.0)
+                f_chip = torch.clamp(xi, min=0.0, max=model.chip_max) * (1.0 - q.pow(-5.0 / 3.0))
+
+                u_r = u_vec - (1.0 + model.e_restitution) * u_n * n_hat
+                t_r = 0.5 * mu * (u_r * u_r).sum()
+
+                e_custo = torch.minimum(f_chip * e_lig, model.energy_max * t_r)
+                if bool((e_custo < f_chip * e_lig).item()):
+                    f_chip = e_custo / e_lig
+
+                m_chip = f_chip * m_P
+                m_G_new = m_G + m_chip
+                m_P_new = m_P - m_chip
+                mu_new = m_G_new * m_P_new / big_m
+
+                t_prime = t_r - e_custo
+                u_prime = u_r * torch.sqrt(t_prime / t_r) * torch.sqrt(mu / mu_new)
+
+                s = 1.0 if i_is_big else -1.0
+                delta_shift = s * (m_chip / big_m) * dr_tc
+
+                if i_is_big:
+                    m_i_new, m_j_new = m_G_new, m_P_new
+                else:
+                    m_i_new, m_j_new = m_P_new, m_G_new
+
+                r_i_new = r_i_tc + delta_shift
+                r_j_new = r_j_tc + delta_shift
+                v_cm = (m_i * v_i + m_j * v_j) / big_m
+                v_i_new = v_cm - (m_j_new / big_m) * u_prime
+                v_j_new = v_cm + (m_i_new / big_m) * u_prime
+
+                event_delta_e, event_delta_l = _general_accounting(
+                    slot_idx, r_ref, v_cur, m_cur, t_ref, t_c, i_idx, j_idx,
+                    m_i, m_j, v_i, v_j, r_i_tc, r_j_tc, mu,
+                    m_i_new, m_j_new, v_i_new, v_j_new, r_i_new, r_j_new,
+                    softening, grav_const,
+                )
+            else:
+                n_ricochet += 1
+                impulse_dir = (1.0 + model.e_restitution) * mu * u_n * n_hat
+                v_i_new = v_i + impulse_dir / m_i
+                v_j_new = v_j - impulse_dir / m_j
+                r_i_new = r_i_tc
+                r_j_new = r_j_tc
+                m_i_new = m_i
+                m_j_new = m_j
+
+                # Sec. 4.9, closed form: E_int += 0.5 mu (1 - e^2) u_n^2; Delta U = 0 exact
+                # (mutual and field), Delta L_spin = 0 exact. The O(N) field sum is not run.
+                event_delta_e = float(
+                    (0.5 * mu * (1.0 - model.e_restitution * model.e_restitution) * u_n * u_n).item()
+                )
+                event_delta_l = torch.zeros(3, dtype=torch.float64, device=device)
+
+        r_ref[i_idx] = r_i_new
+        r_ref[j_idx] = r_j_new
+        t_ref[i_idx] = t_c
+        t_ref[j_idx] = t_c
+        v_cur[i_idx] = v_i_new
+        v_cur[j_idx] = v_j_new
+        m_cur[i_idx] = m_i_new
+        m_cur[j_idx] = m_j_new
 
         delta_e_int += event_delta_e
         delta_l_spin = delta_l_spin + event_delta_l.to(torch.float64)
 
+    r_final = r_ref + (dt - t_ref).unsqueeze(-1) * v_cur
+
     return CollisionOutcome(
-        state=State(r=r_new, v=v_new, m=m_new),
-        n_elastic=n_elastic,
+        state=State(r=r_final, v=v_cur, m=m_cur),
+        n_ricochet=n_ricochet,
         n_merge=n_merge,
-        n_fragment=n_fragment,
+        n_erosion=n_erosion,
         delta_e_int=delta_e_int,
         delta_l_spin=delta_l_spin,
         f_reject=accepted.f_reject,
         c_coll_max=c_coll_max,
     )
+
+
+def _general_accounting(
+    slot_idx: torch.Tensor,
+    r_ref: torch.Tensor,
+    v_cur: torch.Tensor,
+    m_cur: torch.Tensor,
+    t_ref: torch.Tensor,
+    t_c: float,
+    i_idx: int,
+    j_idx: int,
+    m_i: torch.Tensor,
+    m_j: torch.Tensor,
+    v_i: torch.Tensor,
+    v_j: torch.Tensor,
+    r_i_tc: torch.Tensor,
+    r_j_tc: torch.Tensor,
+    mu: torch.Tensor,
+    m_i_new: torch.Tensor,
+    m_j_new: torch.Tensor,
+    v_i_new: torch.Tensor,
+    v_j_new: torch.Tensor,
+    r_i_new: torch.Tensor,
+    r_j_new: torch.Tensor,
+    softening: float,
+    grav_const: float,
+) -> tuple[float, torch.Tensor]:
+    """Sec. 4.10, general accounting rule, used by fusion and erosion (never ricochet, which
+    has a closed form and skips this entirely). E_int += -(Delta K + Delta U); Delta U splits
+    into the pair term (i, j only) and the field term (Sec. 4.5 item 3's "current state" of
+    every other slot, one tensor op over the N-slot vector -- not a Python loop over k).
+    """
+    delta_k = (
+        0.5 * (m_i_new * (v_i_new * v_i_new).sum() + m_j_new * (v_j_new * v_j_new).sum())
+        - 0.5 * (m_i * (v_i * v_i).sum() + m_j * (v_j * v_j).sum())
+    )
+
+    d_before = torch.sqrt(((r_j_tc - r_i_tc) * (r_j_tc - r_i_tc)).sum())
+    d_after = torch.sqrt(((r_j_new - r_i_new) * (r_j_new - r_i_new)).sum())
+    d_tilde_before = _softened(d_before, softening)
+    d_tilde_after = _softened(d_after, softening)
+
+    delta_u_par = (
+        -grav_const * m_i_new * m_j_new / d_tilde_after
+        + grav_const * m_i * m_j / d_tilde_before
+    )
+
+    others = torch.ones(slot_idx.shape[0], dtype=torch.bool, device=slot_idx.device)
+    others[i_idx] = False
+    others[j_idx] = False
+
+    pos_all = r_ref + (t_c - t_ref).unsqueeze(-1) * v_cur
+    m_k = m_cur
+
+    diff_ik = pos_all - r_i_tc.unsqueeze(0)
+    diff_jk = pos_all - r_j_tc.unsqueeze(0)
+    diff_ak = pos_all - r_i_new.unsqueeze(0)
+    diff_bk = pos_all - r_j_new.unsqueeze(0)
+
+    d_ik = _softened(torch.sqrt((diff_ik * diff_ik).sum(dim=-1)), softening)
+    d_jk = _softened(torch.sqrt((diff_jk * diff_jk).sum(dim=-1)), softening)
+    d_ak = _softened(torch.sqrt((diff_ak * diff_ak).sum(dim=-1)), softening)
+    d_bk = _softened(torch.sqrt((diff_bk * diff_bk).sum(dim=-1)), softening)
+
+    field_terms = m_k * ((m_i_new / d_ak - m_i / d_ik) + (m_j_new / d_bk - m_j / d_jk))
+    field_terms = torch.where(others, field_terms, torch.zeros_like(field_terms))
+    delta_u_campo = -grav_const * field_terms.sum()
+
+    delta_u = delta_u_par + delta_u_campo
+    event_delta_e = float((-(delta_k + delta_u)).item())
+
+    dr_before = r_j_tc - r_i_tc
+    dr_after = r_j_new - r_i_new
+    u_before = v_j - v_i
+    u_after = v_j_new - v_i_new
+    # m_i_new + m_j_new == m_i + m_j exactly (mass is conserved within the pair by both the
+    # fusion and erosion maps), and m_i, m_j are both > 0 (detect() only pairs live slots), so
+    # this sum is strictly positive -- no guard needed.
+    mu_new = m_i_new * m_j_new / (m_i_new + m_j_new)
+    event_delta_l = mu * _cross3(dr_before, u_before) - mu_new * _cross3(dr_after, u_after)
+
+    return event_delta_e, event_delta_l
 
 
 def collision_pass(state: State, dt: float, model: CollisionModel, generator, softening: float) -> CollisionOutcome:

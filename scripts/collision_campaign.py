@@ -52,7 +52,7 @@ Usage:
     python scripts/collision_campaign.py                 # the full 4-seed ensemble, ~35 min
     python scripts/collision_campaign.py --seeds 20190225 --n 200 --n-steps 2000   # smoke
 
-Output: results/2026/collision_campaign_<device>_<backend>_<vcoh>.csv (one row per seed) and
+Output: results/2026/collision_campaign_<device>_<backend>_contato.csv (one row per seed) and
 a matching _series.csv (the sampled time series). The filename carries the configuration
 because the per-seed numbers differ between configurations by construction.
 """
@@ -81,7 +81,7 @@ torch.set_default_dtype(torch.float64)
 RESULTS_DIR = os.path.join(os.path.dirname(__file__), "..", "results", "2026")
 
 
-def results_paths(device: str, v_coh_mode: str, backend: str) -> tuple[str, str]:
+def results_paths(device: str, backend: str) -> tuple[str, str]:
     """Output paths tagged by the configuration that produced them.
 
     A fixed filename would be wrong here rather than merely untidy: this campaign's whole
@@ -89,7 +89,10 @@ def results_paths(device: str, v_coh_mode: str, backend: str) -> tuple[str, str]
     (see run_one_seed on device and reduction order). Letting a cuda run silently overwrite a
     cpu one would destroy exactly the comparison the script exists to make.
     """
-    tag = f"{device}_{backend}_{v_coh_mode}".replace("-", "")
+    # "contato" marks the revision (f) deterministic contact model. The retired stochastic
+    # runs are tagged "fromstate" and stay on disk beside these -- different physics, so
+    # letting one overwrite the other would erase the comparison.
+    tag = f"{device}_{backend}_contato"
     return (
         os.path.join(RESULTS_DIR, f"collision_campaign_{tag}.csv"),
         os.path.join(RESULTS_DIR, f"collision_campaign_{tag}_series.csv"),
@@ -116,49 +119,37 @@ class EnsembleTotals:
     """
 
     def __init__(self):
-        self.n_elastic = 0
+        self.n_ricochet = 0
         self.n_merge = 0
-        self.n_fragment = 0
+        self.n_erosion = 0
         self.delta_e_int = 0.0
         self.c_coll_max = 0.0
         self.f_reject_max = 0.0
 
     def add_chunk(self, stats) -> None:
-        self.n_elastic += stats.n_elastic
+        self.n_ricochet += stats.n_ricochet
         self.n_merge += stats.n_merge
-        self.n_fragment += stats.n_fragment
+        self.n_erosion += stats.n_erosion
         self.delta_e_int += stats.delta_e_int
         self.c_coll_max = max(self.c_coll_max, stats.c_coll_max)
         self.f_reject_max = max(self.f_reject_max, stats.f_reject_max)
 
 
-def resolve_v_coh(state, mode: str) -> float:
-    """The regime map's velocity scale, by either of the two readings of "v_coh = V_CHAR".
-
-    They are not the same number. `from-state` recomputes sqrt(G M_real / R_0) from the
-    realized masses, which is what nbody.collisions.v_coh_from_state does and what the API
-    contract prescribes; `v-char` uses the rounded literal config.V_CHAR = 3.2799885. For the
-    equal-mass cold sphere they differ by 1.1e-5 relative -- ten orders of magnitude above
-    round-off.
-
-    MEASURED 2026-08-09, seed 20190225, full 3 t_ff protocol: the two give IDENTICAL results
-    (N_final = 781, max m/M = 0.3154, 3138 events, |E_int|/|E0| = 10.077). The option was
-    added on the hypothesis that this difference explained why the published Sec. 4.13.7
-    numbers do not reproduce, and that hypothesis is refuted. The reason is that v_coh does
-    not perturb the continuous trajectory at all: it only shifts p_frag, by 1.6e-6, so a draw
-    flips only when u1 lands within 1.6e-6 of a channel boundary -- about a 0.5% chance over
-    3138 events. None flipped.
-
-    The option is kept because it makes the ambiguity in "v_coh = V_CHAR" explicit and lets
-    the null result be re-derived rather than taken on trust.
-    """
-    if mode == "v-char":
-        return config.V_CHAR
-    return collisions.v_coh_from_state(state, config.SPHERE_RADIUS)
+# RETIRED 2026-08-09 (f), with the stochastic regime map itself: resolve_v_coh() and the
+# --v-coh axis. They existed to make explicit the two readings of "v_coh = V_CHAR" -- the
+# realized sqrt(G M_real / R_0) versus the rounded literal 3.2799885, which differ by 1.1e-5
+# relative -- on the hypothesis that this explained why the published Sec. 4.13.7 per-seed
+# numbers do not reproduce. MEASURED 2026-08-09, seed 20190225, full 3 t_ff: the two gave
+# IDENTICAL results (N_final = 781, max m/M = 0.3154, 3138 events, |E_int|/|E0| = 10.077), so
+# the hypothesis was refuted -- v_coh never perturbed the trajectory, it only shifted p_frag by
+# 1.6e-6. The null result is kept here in prose because the code that produced it is gone: the
+# outcome cascade has no velocity scale of its own since revision (f), so there is no longer an
+# ambiguity to resolve. What remains as the cause of non-reproduction is reduction order in the
+# force kernel's row sums, as the module docstring records.
 
 
 def run_one_seed(collision_seed, n, n_steps, dt, out_dt, softening, positions_seed, backend,
-                 v_coh_mode="from-state", device="cpu"):
+                 device="cpu"):
     """One trajectory. Returns a summary dict and the sampled series.
 
     device matters for reproducing published numbers, not just for speed: the force kernel
@@ -172,7 +163,6 @@ def run_one_seed(collision_seed, n, n_steps, dt, out_dt, softening, positions_se
     model = collisions.CollisionModel(
         r_ref=config.R_REF_DEFAULT,
         m_bar=config.PARTICLE_MASS,
-        v_coh=resolve_v_coh(state, v_coh_mode),
         seed=collision_seed,
     )
     # Owned here, passed to every integrate() call, never rebuilt -- see the module docstring.
@@ -228,7 +218,6 @@ def run_one_seed(collision_seed, n, n_steps, dt, out_dt, softening, positions_se
     return {
         "collision_seed": collision_seed,
         "positions_seed": positions_seed,
-        "v_coh_mode": v_coh_mode,
         "device": device,
         "n": n,
         "n_steps": n_steps,
@@ -242,9 +231,9 @@ def run_one_seed(collision_seed, n, n_steps, dt, out_dt, softening, positions_se
         "transition_over_tff": (n_steps * dt - t_runaway) / config.T_FF if t_runaway is not None else float("nan"),
         "max_e_int_over_e0": max_e_int_ratio,
         "n_merge": totals.n_merge,
-        "n_elastic": totals.n_elastic,
-        "n_fragment": totals.n_fragment,
-        "n_events": totals.n_merge + totals.n_elastic + totals.n_fragment,
+        "n_ricochet": totals.n_ricochet,
+        "n_erosion": totals.n_erosion,
+        "n_events": totals.n_merge + totals.n_ricochet + totals.n_erosion,
         "mass_rel_error": abs(m64.sum().item() - config.PARTICLE_MASS * n) / (config.PARTICLE_MASS * n),
         "f_reject_max": totals.f_reject_max,
         "c_coll_max": totals.c_coll_max,
@@ -273,9 +262,9 @@ def report(rows):
         return
 
     merges = sum(r["n_merge"] for r in clean)
-    elastics = sum(r["n_elastic"] for r in clean)
-    frags = sum(r["n_fragment"] for r in clean)
-    total = merges + elastics + frags
+    ricochets = sum(r["n_ricochet"] for r in clean)
+    erosions = sum(r["n_erosion"] for r in clean)
+    total = merges + ricochets + erosions
     print()
     if total == 0:
         # Reachable from any run too short to reach contact -- the smoke invocations in the
@@ -285,8 +274,8 @@ def report(rows):
               f"reach contact, and no channel statistic is defined")
         return
     print(f"channels aggregated over {len(clean)} clean seed(s), {total} events: "
-          f"{100 * elastics / total:.1f}% elastic, {100 * merges / total:.1f}% fusion, "
-          f"{100 * frags / total:.1f}% fragmentation")
+          f"{100 * ricochets / total:.1f}% ricochet, {100 * merges / total:.1f}% fusion, "
+          f"{100 * erosions / total:.1f}% erosion")
 
     print()
     print("INV-31 clauses this run can speak to:")
@@ -295,7 +284,7 @@ def report(rows):
     median_events = float(np.median([r["n_events"] for r in clean]))
     print(f"  (C2) median events >= 50                   : "
           f"{'PASS' if median_events >= 50 else 'FAIL'}  (median {median_events:.0f})")
-    ok_c5 = total and min(elastics, merges, frags) / total >= 0.05
+    ok_c5 = total and min(ricochets, merges, erosions) / total >= 0.05
     print(f"  (C5) every channel >= 5% aggregated        : {'PASS' if ok_c5 else 'FAIL'}")
     n_c6 = sum(1 for r in clean if r["min_m_over_mbar"] >= C6_MIN_MASS_OVER_MBAR)
     print(f"  (C6) min m/m_bar >= 1e-3 in >= 3 of 4      : "
@@ -334,10 +323,6 @@ def main():
     parser.add_argument("--backend", default="torch_eager")
     parser.add_argument("--device", default="cpu",
                         help="cpu or cuda; see run_one_seed on why this changes the numbers")
-    parser.add_argument(
-        "--v-coh", choices=("from-state", "v-char"), default="from-state",
-        help="which reading of 'v_coh = V_CHAR' to use; see resolve_v_coh",
-    )
     args = parser.parse_args()
 
     backend = get_backend(args.backend)
@@ -345,14 +330,14 @@ def main():
           f"{args.n_steps} steps, dt={args.dt:g} s "
           f"({args.n_steps * args.dt / config.T_FF:.3f} t_ff), backend={args.backend}")
     print(f"cold sphere (equal masses, Q=0), positions seed {args.positions_seed} held fixed, "
-          f"chi = {config.R_REF_DEFAULT / config.SOFTENING:g}, v_coh = {args.v_coh}, "
+          f"chi = {config.R_REF_DEFAULT / config.SOFTENING:g}, e = {config.E_RESTITUTION:g}, "
           f"device = {args.device}")
 
     rows, all_series = [], []
     for seed in args.seeds:
         print(f"\n  seed {seed} ...", flush=True)
         row, series = run_one_seed(seed, args.n, args.n_steps, args.dt, args.out_dt,
-                                   args.softening, args.positions_seed, backend, args.v_coh,
+                                   args.softening, args.positions_seed, backend,
                                    args.device)
         if row["failure"]:
             print(f"    {row['failure']}")
@@ -364,7 +349,7 @@ def main():
 
     report(rows)
     print()
-    summary_path, series_path = results_paths(args.device, args.v_coh, args.backend)
+    summary_path, series_path = results_paths(args.device, args.backend)
     write_csv(summary_path, rows)
     write_csv(series_path, all_series)
 

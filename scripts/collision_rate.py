@@ -296,7 +296,7 @@ def run_one(chi: float, population: str, backend, env: dict) -> list[dict]:
         # regardless of whether pair_disjoint accepts or defers it this step.
         cand_i = candidates.i.tolist()
         cand_j = candidates.j.tolist()
-        cand_t = candidates.t_star.tolist()
+        cand_t = candidates.t_c.tolist()
 
         new_pairs = []
         for k in range(n_cand):

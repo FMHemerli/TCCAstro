@@ -83,13 +83,16 @@ threshold here -- the HUD and energy panel say so explicitly, so a large number 
 documented signature it is, not as a defect.
 
 Collisions (--collisions, off by default): wires src/nbody/collisions.py's already-validated
-detection, pairing and three-outcome resolution (elastic, merger, fragmentation) into the same
+detection, pairing and three-outcome resolution (ricochet, merger, erosion) into the same
 integrate() call used for the collisionless path -- integrator="velocity_verlet",
 collision=CollisionModel(...) -- so this script never reimplements any of that physics. The
 contact radius R_i = chi * SOFTENING * (m_i / m_bar)^(1/3) is set by --chi (dimensionless,
-default config.CHI_DEFAULT), read once at startup; m_bar is the run's target mean mass (--mass)
-and v_coh is collisions.v_coh_from_state(state, radius), both computed once and held fixed for
-the run. Off by default, so --cold and the plain random_sphere path are unaffected and stay
+default config.CHI_DEFAULT), read once at startup; m_bar is the run's target mean mass (--mass),
+computed once and held fixed for the run. The outcome of each contact is decided by the
+deterministic gate cascade of Sec. 4.6 revision (f) -- bound pair merges, else enough energy to
+chip erodes, else it bounces with restitution --coefficient-of-restitution (--restitution,
+default config.E_RESTITUTION). No draw is taken in any channel. Off by default, so --cold and
+the plain random_sphere path are unaffected and stay
 bit-for-bit identical to before this flag existed. Turning it on also switches precision to
 float64 and dt to the finer DT_OVER_TFF_COLLISION (both described above) -- neither is a free
 choice; both are what the source physics document's own validated collision campaign used.
@@ -113,7 +116,7 @@ them is wrong in this mode.
 Usage:
     python scripts/realtime.py [--n N] [--mass MASS] [--radius RADIUS] [--cold]
         [--alpha ALPHA] [--mass-ratio RATIO] [--virial-q Q] [--f-cut F_CUT] [--seed SEED]
-        [--collisions] [--chi CHI]
+        [--collisions] [--chi CHI] [--restitution E]
 
 Defaults for every option match nbody.config. No upper-bound validation is applied to --n, --mass
 or --radius by design: if a value is large enough to be slow or to exhaust GPU memory, it is
@@ -291,7 +294,7 @@ def parse_args():
     )
     parser.add_argument(
         "--collisions", action="store_true",
-        help="enable collision resolution (elastic / merger / fragmentation, "
+        help="enable collision resolution (ricochet / merger / erosion, "
         "src/nbody/collisions.py) inside the velocity_verlet drift; OFF by default so --cold "
         "and the plain random_sphere path stay bit-for-bit identical to before this flag existed. "
         "Also switches precision to float64 and dt to a finer fraction of t_ff (both required for "
@@ -304,10 +307,20 @@ def parse_args():
         help="dimensionless contact-radius parameter, chi = R_ref / SOFTENING "
         "(R_i = chi * SOFTENING * (m_i / m_bar)^(1/3)); ignored unless --collisions is set",
     )
+    parser.add_argument(
+        "--restitution", type=float, default=config.E_RESTITUTION,
+        help="coefficient of restitution e of the ricochet channel, in (0, 1] "
+        "(Sec. 4.9 revision (f)). The normal component of the relative velocity is reversed and "
+        "scaled by e; the dissipated fraction (1 - e^2) goes to E_int. e = 1 is the exactly "
+        "energy-conserving bounce; ignored unless --collisions is set",
+    )
     args = parser.parse_args()
 
     if args.collisions and args.chi <= 0.0:
         parser.error(f"--chi must be positive, got {args.chi}")
+
+    if args.collisions and not 0.0 < args.restitution <= 1.0:
+        parser.error(f"--restitution must be in (0, 1], got {args.restitution}")
 
     if not args.cold and args.virial_q != 0.0:
         q_max = config.Q_USABLE_COEFF * args.f_cut**2
@@ -376,6 +389,7 @@ class Viewer:
         # CollisionModel, which is built further down once self.state exists.
         self.collisions_enabled = args.collisions
         self.chi = args.chi
+        self.restitution = args.restitution
         self.dtype = COLLISION_DTYPE if self.collisions_enabled else DTYPE
 
         if self.cold:
@@ -431,26 +445,26 @@ class Viewer:
         # (--chi <= 0.0 was already rejected in parse_args, before the GPU was touched). m_bar is
         # this run's target mean mass (--mass, the same scale random_sphere's spectrum was
         # generated around), not the hardcoded config.PARTICLE_MASS default, so the contact-radius
-        # formula stays consistent with whatever mass scale the user chose. v_coh is computed once
-        # here, from the realized initial state and the initial sphere radius (Sec. 4.6: v_coh =
-        # V_CHAR = sqrt(G M_real / R_0)), and held fixed for the run -- it is an initial-condition-
-        # derived scale, not a per-frame quantity, exactly like t_ff and dt above.
+        # formula stays consistent with whatever mass scale the user chose. The outcome model
+        # carries no velocity scale of its own since revision (f): the gates of Sec. 4.6 are built
+        # from the pair's own masses and contact radii, so nothing initial-condition-derived has
+        # to be computed and frozen here the way t_ff and dt above are.
         self.n_live = self.n
         if self.collisions_enabled:
             r_ref = self.chi * config.SOFTENING
-            v_coh = collisions.v_coh_from_state(self.state, self.radius)
-            self.collision_model = collisions.CollisionModel(r_ref, self.mass, v_coh=v_coh)
-            # integrate() draws exactly 2 uniform samples per accepted collision event from this
-            # generator (Sec. 4.7.1), and that draw sequence must be continuous over the whole
-            # run, not restarted at every integrate() call: on_timer calls integrate() once per
-            # rendered frame, so the SAME np.random.Generator instance is created here, once, and
-            # passed to every one of those calls (never rebuilt per frame -- rebuilding it would
-            # restart the stream and bias the elastic/merger/fragment channel mix, as measured
-            # before integrate() grew the collision_rng parameter that lets a caller own it).
+            self.collision_model = collisions.CollisionModel(
+                r_ref, self.mass, e_restitution=self.restitution
+            )
+            # Sec. 4.7.1 revision (f): the outcome cascade is deterministic and consumes ZERO
+            # draws in every channel, so this generator's state is bit-for-bit identical before
+            # and after any pass (INV-32). It is still created once and passed to every
+            # integrate() call rather than being dropped, because integrate() still takes it and
+            # a future stochastic channel would need the stream continuous across the one call
+            # per rendered frame that on_timer makes.
             self.collision_rng = np.random.default_rng(self.collision_model.seed)
-            self.n_elastic_total = 0
+            self.n_ricochet_total = 0
             self.n_merge_total = 0
-            self.n_fragment_total = 0
+            self.n_erosion_total = 0
             self.e_int_total = 0.0
             self.c_coll_max = 0.0
             self.f_reject_max = 0.0
@@ -579,9 +593,9 @@ class Viewer:
         scalar bookkeeping only -- everything folded in here was already computed by the
         collision pass inside integrate(); this adds no extra O(N) or O(N^2) work per frame.
         """
-        self.n_elastic_total += frame_stats.n_elastic
+        self.n_ricochet_total += frame_stats.n_ricochet
         self.n_merge_total += frame_stats.n_merge
-        self.n_fragment_total += frame_stats.n_fragment
+        self.n_erosion_total += frame_stats.n_erosion
         self.e_int_total += frame_stats.delta_e_int
         self.c_coll_max = max(self.c_coll_max, frame_stats.c_coll_max)
         self.f_reject_max = max(self.f_reject_max, frame_stats.f_reject_max)
@@ -795,9 +809,10 @@ class Viewer:
                 f"integrator: velocity_verlet   steps/frame: {STEPS_PER_FRAME_COLLISION}   "
                 f"dt: {self.dt:.4e} s ({DT_OVER_TFF_COLLISION:.2e} t_ff)",
                 f"fps: {self.fps_ema:6.1f}   t = {self.sim_time / self.t_ff:7.4f} t_ff   step {self.step_count}",
-                f"collisions: ON   chi: {self.chi:.4g}   N_live: {self.n_live}/{self.n}",
-                f"events -- elastic: {self.n_elastic_total}   merge: {self.n_merge_total}   "
-                f"fragment: {self.n_fragment_total}",
+                f"collisions: ON   chi: {self.chi:.4g}   e: {self.restitution:.3g}   "
+                f"N_live: {self.n_live}/{self.n}",
+                f"events -- ricochet: {self.n_ricochet_total}   merge: {self.n_merge_total}   "
+                f"erosion: {self.n_erosion_total}",
                 f"REPORTED, not a stopping criterion: E_int/|E0| = {self.e_int_total / abs(self.e0):.4e}   "
                 f"|dE_total/E0| = {self.rel_error:.4e}",
                 freeze_line,

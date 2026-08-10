@@ -143,8 +143,8 @@ def _collision_hud_lines(viewer, t_tff: float) -> list[str]:
         f"dt: {viewer.dt:.4e} s ({realtime.DT_OVER_TFF_COLLISION:.2e} t_ff)",
         f"t = {t_tff:7.4f} t_ff   step {viewer.step_count}",
         f"collisions: ON   chi: {viewer.chi:.4g}   N_live: {viewer.n_live}/{viewer.n}",
-        f"events -- elastic: {viewer.n_elastic_total}   merge: {viewer.n_merge_total}   "
-        f"fragment: {viewer.n_fragment_total}",
+        f"events -- ricochet: {viewer.n_ricochet_total}   merge: {viewer.n_merge_total}   "
+        f"erosion: {viewer.n_erosion_total}",
         f"REPORTED, not a stopping criterion: E_int/|E0| = "
         f"{viewer.e_int_total / abs(viewer.e0):.4e}   |dE_total/E0| = {viewer.rel_error:.4e}",
         "",

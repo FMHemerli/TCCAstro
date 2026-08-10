@@ -140,9 +140,7 @@ def build_initial_state(n: int, seed: int, cold: bool, virial_ratio: float):
 def run(n, n_steps, dt, softening, seed, collision_seed, cold, virial_ratio):
     backend = get_backend("torch_eager")
     state = build_initial_state(n, seed, cold, virial_ratio)
-    model = collisions.CollisionModel(
-        v_coh=collisions.v_coh_from_state(state, config.SPHERE_RADIUS), seed=collision_seed
-    )
+    model = collisions.CollisionModel(seed=collision_seed)
     rng = np.random.default_rng(model.seed)
     a = backend.accelerations(state.r, state.m, softening)
 
@@ -187,9 +185,9 @@ def run(n, n_steps, dt, softening, seed, collision_seed, cold, virial_ratio):
             if m_b == 0.0:
                 channel = "merge"
             elif abs(m_a - m_i) <= 1e-12 * m_i:
-                channel = "elastic"
+                channel = "ricochet"
             else:
-                channel = "frag"
+                channel = "erosion"
 
             for slot in (i, j):
                 previous = last_event.get(slot)
@@ -200,7 +198,7 @@ def run(n, n_steps, dt, softening, seed, collision_seed, cold, virial_ratio):
             last_event[i] = (step, channel, j)
             last_event[j] = (step, channel, i)
 
-            if channel != "frag":
+            if channel != "erosion":
                 continue
 
             big_m = m_i + m_j
@@ -210,6 +208,14 @@ def run(n, n_steps, dt, softening, seed, collision_seed, cold, virial_ratio):
             mu = m_i * m_j / big_m
             u = torch.linalg.norm(v_before[j] - v_before[i]).item()
             t_cm = 0.5 * mu * u * u
+            # Sec. 4.6 revision (f): the gate is T_n > K_BIND G m_P^2 / R_P on the SMALLER body,
+            # with T_n built from the NORMAL component of u at contact -- not T_cm, and not the
+            # larger body. Both substitutions were live defects in the retired model: T_cm let
+            # grazing passes through, and the larger body's threshold is smaller by q^(5/3),
+            # which is 91500x at the q = 949 measured here. binding_energy already carries the
+            # 0.6 coefficient, which is K_BIND, so it is the specification's E_lig verbatim.
+            u_n = float(accepted.u_n[k])
+            t_n = 0.5 * mu * u_n * u_n
 
             old_contact = contact_radius(m_i, model.r_ref) + contact_radius(m_j, model.r_ref)
             new_contact = contact_radius(m_a, model.r_ref) + contact_radius(m_b, model.r_ref)
@@ -231,6 +237,8 @@ def run(n, n_steps, dt, softening, seed, collision_seed, cold, virial_ratio):
                     "speed_ratio_closed_form": speed_ratio(q, f),
                     "t_cm_over_ebind_big": t_cm / binding_energy(m_big, model.r_ref),
                     "t_cm_over_ebind_pair": t_cm / binding_energy(big_m, model.r_ref),
+                    # The gate actually applied. Must be > 1 for every row in this file.
+                    "t_n_over_elig_small": t_n / binding_energy(m_small, model.r_ref),
                 }
             )
 
@@ -296,14 +304,15 @@ def report(result, n, n_steps, dt):
         return
 
     print()
-    print(f"FRAGMENTATION EVENTS: {len(events)}")
+    print(f"EROSION EVENTS: {len(events)}")
     print(f"  {'':34}{'min':>12}{'median':>12}{'p90':>12}{'max':>12}")
     for key, label in (
         ("mass_ratio_q", "incoming mass ratio q"),
         ("split_f", "split f (lighter fragment)"),
         ("placement_ratio", "placement / old contact sep"),
         ("speed_ratio", "|u'| / |u|"),
-        ("t_cm_over_ebind_big", "T_cm / E_bind(larger body)"),
+        ("t_n_over_elig_small", "T_n / E_lig(smaller) -- THE GATE"),
+        ("t_cm_over_ebind_big", "T_cm / E_bind(larger) -- retired"),
     ):
         print(f"  {label:34}{describe([e[key] for e in events])}")
 

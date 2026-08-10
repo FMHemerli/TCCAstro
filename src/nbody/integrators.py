@@ -14,24 +14,24 @@ from .state import State
 class CollisionRunStats:
     """Long-run collision accumulators, owned by the integration loop (Sec. 9.1.1, point 1:
     resolve() is pure and returns only this pass's deltas; the loop -- not collisions.py --
-    is where they accumulate). n_elastic/n_merge/n_fragment are exact event counts.
+    is where they accumulate). n_ricochet/n_merge/n_erosion are exact event counts.
     delta_e_int and delta_l_spin accumulate in fp64 regardless of the state's own dtype (Sec.
     7: "o diagnostico de energia colisional ... e sempre acumulado em fp64"). c_coll_max and
     f_reject_max are running maxima over the passes seen so far (Sec. 4.4.5, 4.5: both are
     reported quantities, never bloqueantes)."""
 
-    n_elastic: int = 0
+    n_ricochet: int = 0
     n_merge: int = 0
-    n_fragment: int = 0
+    n_erosion: int = 0
     delta_e_int: float = 0.0
     delta_l_spin: torch.Tensor | None = None
     c_coll_max: float = 0.0
     f_reject_max: float = 0.0
 
     def update(self, outcome: "collisions.CollisionOutcome") -> None:
-        self.n_elastic += outcome.n_elastic
+        self.n_ricochet += outcome.n_ricochet
         self.n_merge += outcome.n_merge
-        self.n_fragment += outcome.n_fragment
+        self.n_erosion += outcome.n_erosion
         self.delta_e_int += outcome.delta_e_int
         self.delta_l_spin = (
             outcome.delta_l_spin.clone()

@@ -103,11 +103,16 @@ COLLISION_SEED = 20190225
 # (resolved) runs and fixes dt = DT_COLLAPSE, N_STEPS_COLLISION = 12600 instead; that stage-3
 # campaign wiring (a config.CollisionParams / RUN_COLLISION analogue to RUN_COLLAPSE) does not
 # exist yet and is not added here -- see the final report.
-MAP_X_CLAMP = 1.0e12
-MAP_ELASTIC_WEIGHT = 3.0
-COLLISION_DRAWS_PER_EVENT = 2
-FRAG_F_MIN = 0.1
-FRAG_ETA = 0.0
+#
+# Deterministic contact model, revision (f) 2026-08-09 (Sec. 4.6, 4.9, 4.10). Replaces the
+# probabilistic regime map (MAP_X_CLAMP, MAP_ELASTIC_WEIGHT) and the drawn fragmentation split
+# (FRAG_F_MIN, FRAG_ETA), both retired by this revision.
+E_RESTITUTION = 0.8
+K_BIND = 0.6
+FRAG_CHIP_COEFF = 0.5
+FRAG_CHIP_MAX = 0.5
+FRAG_ENERGY_MAX = 0.9
+COLLISION_DRAWS_PER_EVENT = 0
 
 
 @dataclass(frozen=True)
